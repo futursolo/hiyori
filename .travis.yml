@@ -1,0 +1,40 @@
+sudo: false
+
+matrix:
+  allow_failures:
+    - python: nightly
+
+  include:
+    - os: linux
+      python: 3.6.0
+
+    - os: linux
+      python: 3.6.1
+
+    - os: linux
+      python: 3.6.2
+
+    - os: linux
+      python: 3.6.3
+
+    - os: linux
+      python: 3.6.4
+
+    - os: linux
+      python: 3.6.5
+
+    - os: linux
+      python: 3.6
+
+    - os: linux
+      python: nightly
+
+language: python
+
+install:
+  - pip install .[test]
+
+# commands to run tests
+script:
+  - mypy --python-version 3.6 --strict --ignore-missing-imports --show-error-context --show-traceback -p magichttp
+  - flake8 .

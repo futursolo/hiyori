@@ -59,7 +59,7 @@ class _HttpClientProtocolIdentifier(NamedTuple):
             scheme=__pending_request.scheme)
 
 
-class _HttpClientProtocol(magichttp.HttpClientProtocol):
+class _HttpClientProtocol(magichttp.HttpClientProtocol):  # type: ignore
     def __init__(
         self, conn_id: _HttpClientProtocolIdentifier, chunk_size: int
             ) -> None:

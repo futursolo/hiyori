@@ -188,7 +188,7 @@ class PendingRequest:
 
 class ResponseBody(bytes):
     def as_json(self) -> Union[dict, list, int, str, float, bool, None]:
-        return json.loads(self.decode("utf-8"))
+        return json.loads(self.decode("utf-8"))  # type: ignore
 
 
 _EMPTY_RESPONSE_BODY = ResponseBody()
@@ -208,15 +208,15 @@ class Request:
 
     @property
     def uri(self) -> str:
-        return self._writer.initial.uri
+        return self._writer.initial.uri  # type: ignore
 
     @property
     def authority(self) -> str:
-        return self._writer.initial.authority
+        return self._writer.initial.authority  # type: ignore
 
     @property
     def scheme(self) -> str:
-        return self._writer.initial.scheme
+        return self._writer.initial.scheme  # type: ignore
 
     @property
     def headers(self) -> "magicdict.FrozenTolerantMagicDict[str, str]":
