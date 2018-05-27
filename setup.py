@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2017 Kaede Hoshikawa
+#   Copyright 2018 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -17,40 +17,38 @@
 
 from setuptools import setup, find_packages
 
-import importlib
-import os
 import sys
 
 if not sys.version_info[:3] >= (3, 6, 0):
-    raise RuntimeError("Magicdict requires Python 3.6.0 or higher.")
+    raise RuntimeError("Hiyori requires Python 3.6.0 or higher.")
+else:
+    try:
+        import _modify_version
 
+    except ImportError:
+        pass
 
-def load_version(module_name):
-    _version_spec = importlib.util.spec_from_file_location(
-        "{}._version".format(module_name),
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "{}/_version.py".format(module_name)))
-    _version = importlib.util.module_from_spec(_version_spec)
-    _version_spec.loader.exec_module(_version)
-    return _version.version
+    else:
+        _modify_version.modify("hiyori")
 
+    import _load_version
 
-setup_requires = ["setuptools", "pytest-runner>=2.11.1,<3"]
+setup_requires = ["setuptools>=39", "pytest-runner>=4.2,<5"]
 
-install_requires = ["magichttp>=0.1.0,<1", "magicdict>=0.1.0,<1"]
+install_requires = ["magichttp>=1.0.0,<2", "magicdict>=1.0.2,<2"]
 
-tests_require = ["pytest>=3.0.6,<4"]
+tests_require = ["pytest>=3.6.0,<4", "mypy>=0.600,<1", "flake8>=3.5.0,<4"]
+
 
 if __name__ == "__main__":
     setup(
         name="hiyori",
-        version=load_version("hiyori"),
+        version=_load_version.load("hiyori"),
         author="Kaede Hoshikawa",
         author_email="futursolo@icloud.com",
         url="https://github.com/futursolo/hiyori",
         license="Apache License 2.0",
-        description="An ordered, one-to-many mapping.",
+        description="Hiyori is an http client for asyncio.",
         long_description=open("README.rst", "r").read(),
         packages=find_packages(),
         include_package_data=True,

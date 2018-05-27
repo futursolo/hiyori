@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2017 Kaede Hoshikawa
+#   Copyright 2018 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -15,8 +15,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__all__ = ["__version__", "version"]
+__all__ = ["__version__"]
 
-__version__ = ("0", "1", "0", "-1000")
+_tag_version = "0.0.0"
 
-version = "0.1.0.dev0"
+_dev = 0
+
+if _dev is not None:  # pragma: no cover
+    __version__ = _tag_version + f".dev{_dev}"
+
+else:  # pragma: no cover
+    __version__ = _tag_version

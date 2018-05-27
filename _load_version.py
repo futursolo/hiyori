@@ -15,17 +15,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from .constants import *  # noqa: F401, F403
-from .messages import *  # noqa: F401, F403
-from .exceptions import *  # noqa: F401, F403
-from .http_client import *  # noqa: F401, F403
-from ._version import *  # noqa: F401, F403
+import importlib.util
+import os
 
-from . import constants
-from . import messages
-from . import exceptions
-from . import http_client
-from . import _version
 
-__all__ = constants.__all__ + messages.__all__ + exceptions.__all__ + \
-    http_client.__all__ + _version.__all__
+def load(project_folder: str) -> str:
+    _version_spec = importlib.util.spec_from_file_location(
+        f"{project_folder}._version",
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            f"{project_folder}/_version.py"))
+
+    _version = importlib.util.module_from_spec(_version_spec)
+    _version_spec.loader.exec_module(_version)
+
+    return _version.__version__
