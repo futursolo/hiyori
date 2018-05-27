@@ -37,5 +37,5 @@ install:
 
 # commands to run tests
 script:
-  - mypy --python-version 3.6 --strict --ignore-missing-imports --show-error-context --show-traceback -p magichttp
+  - mypy --python-version 3.6 --strict --ignore-missing-imports --show-error-context --show-traceback -p hiyori
   - flake8 .
