@@ -32,6 +32,7 @@ matrix:
 language: python
 
 install:
+  - pip install -U pip setuptools
   - pip install .[test]
 
 # commands to run tests
