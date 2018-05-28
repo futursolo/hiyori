@@ -18,8 +18,6 @@
 from typing import MutableMapping, Optional, NamedTuple, Mapping, Union
 from typing import Awaitable  # noqa: F401
 
-__all__ = ["HttpClient"]
-
 from . import messages
 from . import exceptions
 from . import constants
@@ -35,6 +33,19 @@ import typing
 
 if typing.TYPE_CHECKING:
     from . import bodies  # noqa: F401
+
+__all__ = [
+    "HttpClient",
+
+    "get",
+    "post",
+    "put",
+    "delete",
+    "head",
+    "options",
+    "connect",
+    "trace",
+    "patch"]
 
 
 class _HttpClientProtocolIdentifier(NamedTuple):
@@ -119,7 +130,7 @@ class _HttpClientProtocol(magichttp.HttpClientProtocol):  # type: ignore
 class HttpClient:
     def __init__(
         self, *, idle_timeout: int=10,
-        default_timeout: int=60,
+        timeout: int=60,
         max_initial_size: int=64 * 1024,  # 64K
         max_body_size: int=2 * 1024 * 1024,  # 2M
         allow_keep_alive: bool=True,
@@ -136,7 +147,7 @@ class HttpClient:
         self._tls_context = tls_context or \
             ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
 
-        self._default_timeout = default_timeout
+        self._timeout = timeout
         self._idle_timeout = idle_timeout
         self._max_idle_connections = max_idle_connections
 
@@ -168,7 +179,7 @@ class HttpClient:
                         conn_id=__id, chunk_size=self._chunk_size),
                     __id.authority, __id.port, ssl=self._tls_context \
                     if __id.scheme == constants.HttpScheme.HTTPS else None),
-                self._default_timeout if timeout is None else timeout)
+                self._timeout if timeout is None else timeout)
 
         except asyncio.TimeoutError as e:
             raise exceptions.RequestTimeout(
@@ -207,7 +218,7 @@ class HttpClient:
             try:
                 response = await asyncio.wait_for(conn._send_request(
                     __pending_request, read_response_body=read_response_body),
-                    self._default_timeout if timeout is None else timeout)
+                    self._timeout if timeout is None else timeout)
 
                 if read_response_body:
                     await self._put_conn(conn)
@@ -307,69 +318,64 @@ class HttpClient:
 
     async def delete(
         self, __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None
+            path_args: Optional[Mapping[str, str]]=None,
+            headers: Optional[Mapping[str, str]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None
             ) -> messages.Response:
-
         return await self.fetch(
             constants.HttpRequestMethod.DELETE, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout)
 
     async def options(
-        self, __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None
+            self, __url: str,
+            path_args: Optional[Mapping[str, str]]=None,
+            headers: Optional[Mapping[str, str]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None
             ) -> messages.Response:
-
         return await self.fetch(
             constants.HttpRequestMethod.OPTIONS, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout)
 
     async def patch(
-        self, __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None
+            self, __url: str,
+            path_args: Optional[Mapping[str, str]]=None,
+            headers: Optional[Mapping[str, str]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None
             ) -> messages.Response:
-
         return await self.fetch(
             constants.HttpRequestMethod.PATCH, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout)
 
     async def trace(
-        self, __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None
+            self, __url: str,
+            path_args: Optional[Mapping[str, str]]=None,
+            headers: Optional[Mapping[str, str]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None
             ) -> messages.Response:
-
         return await self.fetch(
             constants.HttpRequestMethod.TRACE, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout)
 
     async def connect(
-        self, __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None
+            self, __url: str,
+            path_args: Optional[Mapping[str, str]]=None,
+            headers: Optional[Mapping[str, str]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None
             ) -> messages.Response:
-
         return await self.fetch(
             constants.HttpRequestMethod.CONNECT, __url,
             path_args=path_args, headers=headers, body=body,
@@ -384,3 +390,120 @@ class HttpClient:
 
         for tsk in set(self._pending_tsks):
             await tsk
+
+
+async def head(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().head(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def get(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().get(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def post(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().post(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def put(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().put(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def delete(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().delete(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def options(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().options(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def patch(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().patch(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def trace(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().trace(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
+
+
+async def connect(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().connect(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout)
