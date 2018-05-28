@@ -31,6 +31,10 @@ import asyncio
 import weakref
 import urllib.parse
 import magicdict
+import typing
+
+if typing.TYPE_CHECKING:
+    from . import bodies  # noqa: F401
 
 
 class _HttpClientProtocolIdentifier(NamedTuple):
@@ -228,7 +232,7 @@ class HttpClient:
         self, __method: constants.HttpRequestMethod, __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None
             ) -> messages.Response:
@@ -253,7 +257,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None
             ) -> messages.Response:
@@ -266,7 +270,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None
             ) -> messages.Response:
@@ -279,7 +283,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None
             ) -> messages.Response:
@@ -292,7 +296,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None
             ) -> messages.Response:
@@ -305,7 +309,7 @@ class HttpClient:
         self, __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None
             ) -> messages.Response:
@@ -319,7 +323,7 @@ class HttpClient:
         self, __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None
             ) -> messages.Response:
@@ -333,7 +337,7 @@ class HttpClient:
         self, __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None
             ) -> messages.Response:
@@ -347,7 +351,7 @@ class HttpClient:
         self, __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None
             ) -> messages.Response:
@@ -361,7 +365,7 @@ class HttpClient:
         self, __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, messages.BasePendingRequestBody]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None
             ) -> messages.Response:

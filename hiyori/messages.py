@@ -19,96 +19,30 @@ from typing import Optional, Mapping, Union
 
 from . import constants
 from . import _version
+from . import bodies
 
 import urllib.parse
-import json
-import abc
-import io
 import magicdict
 import magichttp
 
 __all__ = [
-    "BasePendingRequestBody",
-    "BytesPendingRequestBody",
     "PendingRequest",
-
-    "ResponseBody",
+    "Request",
     "Response"]
 
 _SELF_IDENTIFIER = "hiyori/{} magichttp/{}".format(
     _version.__version__, magichttp.__version__)
 
 
-class BasePendingRequestBody(abc.ABC):
-    async def calc_len(self) -> int:
-        """
-        Implementation of this method is optional; however,
-        implementing this method will tell the server content length or
-        the body has to be sent by chunked transfer encoding.
-        """
-        raise NotImplementedError
-
-    async def seek_front(self) -> None:
-        """
-        Implementation of this method is optional; however,
-        implementing this method would be helpful on handling 307 and 308
-        redirections.
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    async def read(self, n: int=126 * 1024) -> bytes:  # 128K
-        """
-        Read maximum n bytes or raise :class:`EOFError` if finished.
-        """
-        raise NotImplementedError
-
-
-class BytesPendingRequestBody(BasePendingRequestBody):
-    def __init__(self, buf: bytes) -> None:
-        self._len = len(buf)
-
-        self._io = io.BytesIO(buf)
-        self._io.seek(0, io.SEEK_SET)
-
-    async def calc_len(self) -> int:
-        return self._len
-
-    async def seek_front(self) -> None:
-        self._io.seek(0, io.SEEK_SET)
-
-    async def read(self, n: int=128 * 1024) -> bytes:
-        data = self._io.read(n)
-
-        if not data:
-            raise EOFError
-
-        return data
-
-
-class _EmptyPendingRequestBody(BasePendingRequestBody):
-    async def calc_len(self) -> int:
-        return 0
-
-    async def seek_front(self) -> None:
-        pass
-
-    async def read(self, n: int=128 * 1024) -> bytes:
-        raise EOFError
-
-
-_EMPTY_REQUEST_BODY = _EmptyPendingRequestBody()
-
-
 class PendingRequest:
     def __init__(
-        self, __method: constants.HttpRequestMethod, *,
-        authority: str, path: str="/",
-        path_args: Optional[Mapping[str, str]]=None,
-        scheme: Optional[str]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        version: constants.HttpVersion=constants.HttpVersion.V1_1,
-            body: Optional[Union[bytes, BasePendingRequestBody]]=None) -> None:
+            self, __method: constants.HttpRequestMethod, *,
+            authority: str, path: str="/",
+            path_args: Optional[Mapping[str, str]]=None,
+            scheme: Union[str, constants.HttpScheme]=constants.HttpScheme.HTTP,
+            headers: Optional[Mapping[str, str]]=None,
+            version: constants.HttpVersion=constants.HttpVersion.V1_1,
+            body: Optional[Union[bytes, bodies.BaseRequestBody]]=None) -> None:
         assert path.find("?") == -1, \
             "Please pass path arguments using path_args keyword argument."
 
@@ -116,8 +50,12 @@ class PendingRequest:
         self._version = version
 
         self._authority = authority
-        self._scheme = constants.HttpScheme(scheme.lower()) \
-            if scheme else constants.HttpScheme.HTTP
+
+        if isinstance(scheme, str):
+            self._scheme = constants.HttpScheme(scheme.lower())
+
+        else:
+            self._scheme = scheme
 
         self._path = path
         self._path_args = path_args
@@ -128,12 +66,12 @@ class PendingRequest:
 
         self._cached_uri: Optional[str] = None
 
-        self._body: BasePendingRequestBody
+        self._body: bodies.BaseRequestBody
         if isinstance(body, bytes):
-            self._body = BytesPendingRequestBody(body)
+            self._body = bodies.BytesRequestBody(body)
 
         else:
-            self._body = body or _EMPTY_REQUEST_BODY
+            self._body = body or bodies.EMPTY_REQUEST_BODY
 
     @property
     def method(self) -> constants.HttpRequestMethod:
@@ -167,7 +105,7 @@ class PendingRequest:
         return self._headers
 
     @property
-    def body(self) -> BasePendingRequestBody:
+    def body(self) -> bodies.BaseRequestBody:
         return self._body
 
     def __repr__(self) -> str:
@@ -186,24 +124,16 @@ class PendingRequest:
         return repr(self)
 
 
-class ResponseBody(bytes):
-    def as_json(self) -> Union[dict, list, int, str, float, bool, None]:
-        return json.loads(self.decode("utf-8"))  # type: ignore
-
-
-_EMPTY_RESPONSE_BODY = ResponseBody()
-
-
 class Request:
     def __init__(self, writer: magichttp.HttpRequestWriter) -> None:
         self._writer = writer
 
     @property
-    def method(self) -> "constants.HttpRequestMethod":
+    def method(self) -> constants.HttpRequestMethod:
         return self._writer.initial.method
 
     @property
-    def version(self) -> "constants.HttpVersion":
+    def version(self) -> constants.HttpVersion:
         return self._writer.initial.version
 
     @property
@@ -219,7 +149,7 @@ class Request:
         return self._writer.initial.scheme  # type: ignore
 
     @property
-    def headers(self) -> "magicdict.FrozenTolerantMagicDict[str, str]":
+    def headers(self) -> magicdict.FrozenTolerantMagicDict[str, str]:
         return self._writer.initial.headers
 
     @property
@@ -236,7 +166,8 @@ class Response:
 
         self._reader = reader
 
-        self._body = ResponseBody(body) if body else _EMPTY_RESPONSE_BODY
+        self._body = bodies.ResponseBody(body) \
+            if body else bodies.EMPTY_RESPONSE_BODY
 
     @property
     def request(self) -> Request:
@@ -251,7 +182,7 @@ class Response:
         return self._reader.initial.version
 
     @property
-    def headers(self) -> "magicdict.FrozenTolerantMagicDict[str, str]":
+    def headers(self) -> magicdict.FrozenTolerantMagicDict[str, str]:
         return self._reader.initial.headers
 
     @property
@@ -259,5 +190,5 @@ class Response:
         return self._reader
 
     @property
-    def body(self) -> ResponseBody:
+    def body(self) -> bodies.ResponseBody:
         return self._body
