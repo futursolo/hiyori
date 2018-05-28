@@ -21,6 +21,7 @@ import typing
 
 if typing.TYPE_CHECKING:
     from . import messages  # noqa: F401
+    from . import constants  # noqa: F401
 
 __all__ = [
     "BaseHiyoriException",
@@ -61,14 +62,25 @@ class ResponseEntityTooLarge(BaseHiyoriException):
 
 
 class HttpError(BaseHiyoriException):
-    def __init__(self, response: "messages.Response", *args: Any) -> None:
-        self._response = response
+    def __init__(self, __response: "messages.Response", *args: Any) -> None:
+        self._response = __response
 
-        super().__init__(*args, (str(self._response)))
+        super().__init__(
+            "HTTP {} {}: ".format(
+                int(self.status_code), self.status_code.phrase),
+            *args, str(self._response))
 
     @property
     def response(self) -> "messages.Response":
         return self._response
+
+    @property
+    def status_code(self) -> "constants.HttpStatusCode":
+        return self.response.status_code
+
+    @property
+    def status_description(self) -> str:
+        return self.response.status_code.phrase  # type: ignore
 
 
 class TooManyRedirects(BaseHiyoriException):
