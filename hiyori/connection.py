@@ -18,6 +18,7 @@
 from typing import NamedTuple, Optional
 
 from . import messages
+from . import exceptions
 
 import asyncio
 import typing
@@ -75,28 +76,45 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
             if body_len > 0:
                 __request.headers.setdefault("content-length", str(body_len))
 
-        writer = await self.write_request(
-            __request.method,
-            uri=__request.uri,
-            authority=__request.authority,
-            headers=__request.headers)
+        try:
+            writer = await self.write_request(
+                __request.method,
+                uri=__request.uri,
+                authority=__request.authority,
+                headers=__request.headers)
 
-        while True:
+            while True:
+                try:
+                    body_chunk = await __request.body.read(self._chunk_size)
+
+                except EOFError:
+                    break
+
+                writer.write(body_chunk)
+                await writer.flush()
+
+            writer.finish()
+
+            reader = await writer.read_response()
+
             try:
-                body_chunk = await __request.body.read(self._chunk_size)
+                res_body = await reader.read()
 
-            except EOFError:
-                break
+            except magichttp.ReadFinishedError:
+                res_body = b""
 
-            writer.write(body_chunk)
-            await writer.flush()
+        except (magichttp.ReadAbortedError,
+                magichttp.WriteAbortedError,
+                magichttp.WriteAfterFinishedError) as e:
+            raise exceptions.ConnectionClosed("Connection closed.") from e
 
-        writer.finish()
-        reader = await writer.read_response()
-
-        res_body = await reader.read()
         return messages.Response(
             messages.Request(writer), reader=reader, body=res_body)
+
+    async def _close_conn(self) -> None:
+        self.transport.close()
+
+        await self._conn_lost_event.wait()
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
         super().connection_lost(exc)
