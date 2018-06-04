@@ -111,7 +111,7 @@ class PendingRequest:
 
     @property
     def conn_id(self) -> "connection.HttpConnectionId":
-        return connection.HttpConnectionId(
+        return connection.HttpConnectionId(  # type: ignore  # Any?
             http_version=self.version,
             authority=self.authority,
             scheme=self.scheme)

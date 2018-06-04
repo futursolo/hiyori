@@ -52,61 +52,91 @@ class HttpConnectionId(NamedTuple):
 
 
 class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
-    def __init__(self, conn_id: HttpConnectionId, chunk_size: int) -> None:
+    def __init__(
+            self, conn_id: HttpConnectionId, chunk_size: int,
+            idle_timeout: int) -> None:
         super().__init__(http_version=conn_id.http_version)
 
         self._conn_lost_event = asyncio.Event()
 
         self._conn_id = conn_id
         self._chunk_size = chunk_size
+        self._idle_timeout = idle_timeout
+
+        self._idle_timer: Optional[asyncio.Handle] = None
+
+    def _set_idle_timeout(self) -> None:
+        if self._idle_timer is not None:
+            self._cancel_idle_timeout()
+
+        loop = asyncio.get_event_loop()
+        self._idle_timer = loop.call_later(
+            self._idle_timeout, self.transport.close)
+
+    def _cancel_idle_timeout(self) -> None:
+        if self._idle_timer is not None:
+            self._idle_timer.cancel()
+            self._idle_timer = None
 
     async def _send_request(
         self, __request: "messages.PendingRequest", *,
             read_response_body: bool) -> "messages.Response":
-        if "content-length" not in __request.headers.keys():
-            try:
-                body_len = await __request.body.calc_len()
-
-            except NotImplementedError:
-                __request.headers.setdefault("transfer-encoding", "chunked")
-
-            if body_len > 0:
-                __request.headers.setdefault("content-length", str(body_len))
-
         try:
-            writer = await self.write_request(
-                __request.method,
-                uri=__request.uri,
-                authority=__request.authority,
-                headers=__request.headers)
-
-            while True:
+            self._cancel_idle_timeout()
+            if "content-length" not in __request.headers.keys():
                 try:
-                    body_chunk = await __request.body.read(self._chunk_size)
+                    body_len = await __request.body.calc_len()
 
-                except EOFError:
-                    break
+                except NotImplementedError:
+                    __request.headers.setdefault(
+                        "transfer-encoding", "chunked")
 
-                writer.write(body_chunk)
-                await writer.flush()
-
-            writer.finish()
-
-            reader = await writer.read_response()
+                if body_len > 0:
+                    __request.headers.setdefault(
+                        "content-length", str(body_len))
 
             try:
-                res_body = await reader.read()
+                writer = await self.write_request(
+                    __request.method,
+                    uri=__request.uri,
+                    authority=__request.authority,
+                    headers=__request.headers)
 
-            except magichttp.ReadFinishedError:
-                res_body = b""
+                while True:
+                    try:
+                        body_chunk = await __request.body.read(
+                            self._chunk_size)
 
-        except (magichttp.ReadAbortedError,
-                magichttp.WriteAbortedError,
-                magichttp.WriteAfterFinishedError) as e:
-            raise exceptions.ConnectionClosed("Connection closed.") from e
+                    except EOFError:
+                        break
 
-        return messages.Response(
-            messages.Request(writer), reader=reader, body=res_body)
+                    writer.write(body_chunk)
+                    await writer.flush()
+
+                writer.finish()
+
+                reader = await writer.read_response()
+
+                try:
+                    res_body = await reader.read()
+
+                except magichttp.ReadFinishedError:
+                    res_body = b""
+
+            except (magichttp.ReadAbortedError,
+                    magichttp.WriteAbortedError,
+                    magichttp.WriteAfterFinishedError) as e:
+                raise exceptions.ConnectionClosed("Connection closed.") from e
+
+            self._set_idle_timeout()
+
+            return messages.Response(
+                messages.Request(writer), reader=reader, body=res_body)
+
+        except Exception:
+            self.transport.close()
+
+            raise
 
     async def _close_conn(self) -> None:
         self.transport.close()
@@ -125,9 +155,10 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
     async def connect(
             __id: HttpConnectionId, timeout: int,
             tls_context: Optional[ssl.SSLContext],
-            chunk_size: int)-> "HttpConnection":
+            chunk_size: int, idle_timeout: int)-> "HttpConnection":
         def create_conn() -> "HttpConnection":
-            return HttpConnection(conn_id=__id, chunk_size=chunk_size)
+            return HttpConnection(
+                conn_id=__id, chunk_size=chunk_size, idle_timeout=idle_timeout)
 
         loop = asyncio.get_event_loop()
 

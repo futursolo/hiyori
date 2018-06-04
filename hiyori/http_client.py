@@ -98,8 +98,8 @@ class HttpClient:
             tls_context = None
 
         return await connection.HttpConnection.connect(
-            __id, timeout, tls_context=tls_context,
-            chunk_size=self._chunk_size)
+            __id, timeout=timeout, tls_context=tls_context,
+            chunk_size=self._chunk_size, idle_timeout=self._idle_timeout)
 
     async def _put_conn(self, __conn: connection.HttpConnection) -> None:
         if __conn._closing():
