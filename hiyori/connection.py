@@ -23,6 +23,7 @@ from . import exceptions
 import asyncio
 import typing
 import magichttp
+import ssl
 
 if typing.TYPE_CHECKING:
     from . import constants  # noqa: F401
@@ -45,13 +46,9 @@ class HttpConnectionId(NamedTuple):
         else:
             return 80
 
-    @staticmethod
-    def from_pending_request(
-            __request: messages.PendingRequest) -> "HttpConnectionId":
-        return HttpConnectionId(
-            http_version=constants.HttpVersion.V1_1,
-            authority=__request.authority,
-            scheme=__request.scheme)
+    @property
+    def hostname(self) -> str:
+        return self.authority.split(":", 1)[0]
 
 
 class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
@@ -64,8 +61,8 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
         self._chunk_size = chunk_size
 
     async def _send_request(
-        self, __request: messages.PendingRequest, *,
-            read_response_body: bool) -> messages.Response:
+        self, __request: "messages.PendingRequest", *,
+            read_response_body: bool) -> "messages.Response":
         if "content-length" not in __request.headers.keys():
             try:
                 body_len = await __request.body.calc_len()
@@ -117,9 +114,32 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
         await self._conn_lost_event.wait()
 
     def _closing(self) -> bool:
-        return self.transport.is_closing()  # type: ignore
+        return typing.cast(bool, self.transport.is_closing())
 
     def connection_lost(self, exc: Optional[Exception]) -> None:
         super().connection_lost(exc)
 
         self._conn_lost_event.set()
+
+    @staticmethod
+    async def connect(
+            __id: HttpConnectionId, timeout: int,
+            tls_context: Optional[ssl.SSLContext],
+            chunk_size: int)-> "HttpConnection":
+        def create_conn() -> "HttpConnection":
+            return HttpConnection(conn_id=__id, chunk_size=chunk_size)
+
+        loop = asyncio.get_event_loop()
+
+        try:
+            _, conn = await asyncio.wait_for(
+                loop.create_connection(
+                    create_conn, __id.hostname, __id.port,
+                    ssl=tls_context, server_hostname=__id.hostname),
+                timeout)
+
+        except asyncio.TimeoutError as e:
+            raise exceptions.RequestTimeout(
+                "Failed to connect to remote host.") from e
+
+        return typing.cast(HttpConnection, conn)

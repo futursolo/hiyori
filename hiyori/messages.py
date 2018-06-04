@@ -20,6 +20,7 @@ from typing import Optional, Mapping, Union
 from . import constants
 from . import _version
 from . import bodies
+from . import connection
 
 import urllib.parse
 import magicdict
@@ -107,6 +108,13 @@ class PendingRequest:
     @property
     def body(self) -> bodies.BaseRequestBody:
         return self._body
+
+    @property
+    def conn_id(self) -> "connection.HttpConnectionId":
+        return connection.HttpConnectionId(
+            http_version=self.version,
+            authority=self.authority,
+            scheme=self.scheme)
 
     def __repr__(self) -> str:
         parts = [

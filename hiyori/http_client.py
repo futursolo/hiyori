@@ -49,12 +49,15 @@ __all__ = [
 
 class HttpClient:
     def __init__(
-            self, *, idle_timeout: int=10,
+            self, *,
+            idle_timeout: int=10,
             timeout: int=60,
+
             max_initial_size: int=64 * 1024,  # 64K
             max_body_size: int=2 * 1024 * 1024,  # 2M
-            allow_keep_alive: bool=True,
             chunk_size: int=128 * 1024,  # 128K
+
+            allow_keep_alive: bool=True,
             tls_context: Optional[ssl.SSLContext]=None,
             max_idle_connections: int=100,
             max_redirects: int=10) -> None:
@@ -79,8 +82,8 @@ class HttpClient:
 
     async def _get_conn(
         self, __id: connection.HttpConnectionId,
-            prefer_cached: bool=True,
-            timeout: Optional[int]=None)-> connection.HttpConnection:
+            timeout: int,
+            prefer_cached: bool=True)-> connection.HttpConnection:
         if prefer_cached:
             if __id in self._conns.keys():
                 conn = self._conns.pop(__id)
@@ -88,22 +91,15 @@ class HttpClient:
                 if not conn._closing():
                     return conn
 
-        loop = asyncio.get_event_loop()
+        if __id.scheme == constants.HttpScheme.HTTPS:
+            tls_context: Optional[ssl.SSLContext] = self._tls_context
 
-        try:
-            _, conn = await asyncio.wait_for(  # type: ignore
-                loop.create_connection(
-                    lambda: connection.HttpConnection(
-                        conn_id=__id, chunk_size=self._chunk_size),
-                    __id.authority, __id.port, ssl=self._tls_context \
-                    if __id.scheme == constants.HttpScheme.HTTPS else None),
-                self._timeout if timeout is None else timeout)
+        else:
+            tls_context = None
 
-        except asyncio.TimeoutError as e:
-            raise exceptions.RequestTimeout(
-                "Failed to connect to remote host.") from e
-
-        return conn
+        return await connection.HttpConnection.connect(
+            __id, timeout, tls_context=tls_context,
+            chunk_size=self._chunk_size)
 
     async def _put_conn(self, __conn: connection.HttpConnection) -> None:
         if __conn._closing():
@@ -121,22 +117,27 @@ class HttpClient:
 
         self._conns[__conn._conn_id] = __conn
 
+    async def close(self) -> None:
+        while self._conns:
+            _, conn = self._conns.popitem()
+            await conn._close_conn()
+
     async def send_request(
-        self, __pending_request: messages.PendingRequest, *,
-        read_response_body: bool=True,
+            self, __pending_request: messages.PendingRequest, *,
+            read_response_body: bool=True,
             timeout: Optional[int]=None) -> messages.Response:
-        identifier = connection.HttpConnectionId\
-            .from_pending_request(__pending_request)
+        _timeout = timeout if timeout is not None else self._timeout
+        conn_id = __pending_request.conn_id
 
         for i in range(0, 2):
             conn = await self._get_conn(
-                identifier, prefer_cached=True if i == 0 else False,
-                timeout=timeout)
+                conn_id, prefer_cached=True if i == 0 else False,
+                timeout=_timeout)
 
             try:
                 response = await asyncio.wait_for(conn._send_request(
                     __pending_request, read_response_body=read_response_body),
-                    self._timeout if timeout is None else timeout)
+                    _timeout)
 
                 if read_response_body:
                     await self._put_conn(conn)
@@ -298,11 +299,6 @@ class HttpClient:
             constants.HttpRequestMethod.CONNECT, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout)
-
-    async def close(self) -> None:
-        while self._conns:
-            _, conn = self._conns.popitem()
-            await conn._close_conn()
 
 
 async def head(
