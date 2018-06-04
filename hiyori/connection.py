@@ -116,6 +116,9 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
 
         await self._conn_lost_event.wait()
 
+    def _closing(self) -> bool:
+        return self.transport.is_closing()  # type: ignore
+
     def connection_lost(self, exc: Optional[Exception]) -> None:
         super().connection_lost(exc)
 

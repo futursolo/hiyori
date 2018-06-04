@@ -26,7 +26,6 @@ from . import connection
 import ssl
 import collections
 import asyncio
-import weakref
 import urllib.parse
 import magicdict
 import typing
@@ -78,9 +77,6 @@ class HttpClient:
             connection.HttpConnectionId, connection.HttpConnection] = \
             collections.OrderedDict()
 
-        self._pending_tsks: "weakref.WeakSet[Awaitable[bool]]" = \
-            weakref.WeakSet()
-
     async def _get_conn(
         self, __id: connection.HttpConnectionId,
             prefer_cached: bool=True,
@@ -89,7 +85,7 @@ class HttpClient:
             if __id in self._conns.keys():
                 conn = self._conns.pop(__id)
 
-                if not conn.transport.is_closing():
+                if not conn._closing():
                     return conn
 
         loop = asyncio.get_event_loop()
@@ -107,21 +103,21 @@ class HttpClient:
             raise exceptions.RequestTimeout(
                 "Failed to connect to remote host.") from e
 
-        tsk = loop.create_task(conn._conn_lost_event.wait())
-        self._pending_tsks.add(tsk)
-
         return conn
 
     async def _put_conn(self, __conn: connection.HttpConnection) -> None:
-        if __conn.transport.is_closing():
+        if __conn._closing():
+            await __conn._close_conn()
+
             return
 
         if self._allow_keep_alive is False:
-            __conn.transport.close()
+            await __conn._close_conn()
 
         if __conn._conn_id in self._conns.keys():
             old_conn = self._conns.pop(__conn._conn_id)
-            old_conn.transport.close()
+
+            await old_conn._close_conn()
 
         self._conns[__conn._conn_id] = __conn
 
@@ -148,7 +144,7 @@ class HttpClient:
                 return response
 
             except asyncio.TimeoutError as e:
-                conn.transport.close()
+                await conn._close_conn()
 
                 raise exceptions.RequestTimeout from e
 
@@ -306,12 +302,7 @@ class HttpClient:
     async def close(self) -> None:
         while self._conns:
             _, conn = self._conns.popitem()
-            conn.transport.close()
-
-        await asyncio.sleep(0)
-
-        for tsk in set(self._pending_tsks):
-            await tsk
+            await conn._close_conn()
 
 
 async def head(
