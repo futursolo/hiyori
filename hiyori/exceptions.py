@@ -61,6 +61,13 @@ class ResponseEntityTooLarge(BaseHiyoriException):
     pass
 
 
+class FailedRedirection(BaseHiyoriException):
+    """
+    Raised with hiyori cannot fulfill the redirection request.
+    """
+    pass
+
+
 class HttpError(BaseHiyoriException):
     def __init__(self, __response: "messages.Response", *args: Any) -> None:
         self._response = __response
