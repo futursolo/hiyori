@@ -80,7 +80,8 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
 
     async def _send_request(
         self, __request: "messages.PendingRequest", *,
-            read_response_body: bool) -> "messages.Response":
+            read_response_body: bool,
+            max_body_size: int) -> "messages.Response":
         try:
             self._cancel_idle_timeout()
             if "content-length" not in __request.headers.keys():
@@ -118,10 +119,14 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
                 reader = await writer.read_response()
 
                 try:
-                    res_body = await reader.read()
+                    res_body = await reader.read(max_body_size + 1)
 
                 except magichttp.ReadFinishedError:
                     res_body = b""
+
+                if len(res_body) > max_body_size:
+                    raise exceptions.ResponseEntityTooLarge(
+                        "Response body is too large.")
 
             except (magichttp.ReadAbortedError,
                     magichttp.WriteAbortedError,
@@ -132,6 +137,11 @@ class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
 
             return messages.Response(
                 messages.Request(writer), reader=reader, body=res_body)
+
+        except magichttp.EntityTooLargeError as e:
+            self.transport.close()
+
+            raise exceptions.ResponseEntityTooLarge from e
 
         except Exception:
             self.transport.close()

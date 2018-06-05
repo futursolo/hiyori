@@ -84,6 +84,11 @@ class HttpClient:
             connection.HttpConnectionId, connection.HttpConnection] = \
             collections.OrderedDict()
 
+        class _HttpConnection(connection.HttpConnection):
+            _MAX_INITIAL_SIZE = self._max_initial_size
+
+        self._HttpConnection = _HttpConnection
+
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
             )-> connection.HttpConnection:
@@ -93,7 +98,7 @@ class HttpClient:
         else:
             tls_context = None
 
-        return await connection.HttpConnection.connect(
+        return await self._HttpConnection.connect(
             __id, timeout=timeout, tls_context=tls_context,
             chunk_size=self._chunk_size, idle_timeout=self._idle_timeout)
 
@@ -123,17 +128,20 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         _timeout = timeout if timeout is not None else self._timeout
         _max_redirects = max_redirects or self._max_redirects
+        _max_body_size = max_body_size or self._max_body_size
         conn_id = __request.conn_id
 
         conn = await self._get_conn(conn_id, timeout=_timeout)
 
         try:
             response = await asyncio.wait_for(conn._send_request(
-                __request, read_response_body=read_response_body),
+                __request, read_response_body=read_response_body,
+                max_body_size=_max_body_size),
                 _timeout)
 
         except asyncio.TimeoutError as e:
@@ -141,62 +149,61 @@ class HttpClient:
 
             raise exceptions.RequestTimeout from e
 
-        else:
-            if read_response_body:
-                await self._put_conn(conn)
+        if read_response_body:
+            await self._put_conn(conn)
 
-            if follow_redirection:
-                if response.status_code in (301, 302, 303, 307, 308):
-                    if _max_redirects == 0:
-                        raise exceptions.TooManyRedirects(response.request)
+        if follow_redirection:
+            if response.status_code in (301, 302, 303, 307, 308):
+                if _max_redirects == 0:
+                    raise exceptions.TooManyRedirects(response.request)
 
+                try:
+                    location = response.headers["location"]
+
+                except KeyError as e:
+                    raise exceptions.BadResponse(
+                        "Server asked for a redirection; "
+                        "however, did not specify the location."
+                    ) from e
+
+                if _ABSOLUTE_PATH_RE.match(location) is None:
+                    raise exceptions.FailedRedirection(
+                        "redirection support for relative path "
+                        "is not implemented.")
+
+                if location.startswith("/"):
+                    location = __request.scheme.value.lower() + "://" \
+                        + __request.authority + location
+
+                if response.status_code < 304:
+                    return await self.fetch(
+                        constants.HttpRequestMethod.GET,
+                        location,
+                        follow_redirection=True,
+                        max_redirects=_max_redirects - 1,
+                        timeout=_timeout)
+
+                else:
+                    body = __request.body
                     try:
-                        location = response.headers["location"]
+                        await body.seek_front()
 
-                    except KeyError as e:
-                        raise exceptions.BadResponse(
-                            "Server asked for a redirection; "
-                            "however, did not specify the location."
-                        ) from e
-
-                    if _ABSOLUTE_PATH_RE.match(location) is None:
+                    except NotImplementedError as e:
                         raise exceptions.FailedRedirection(
-                            "redirection support for relative path "
-                            "is not implemented.")
+                            "seek_front is not implemented for"
+                            " current body.") from e
 
-                    if location.startswith("/"):
-                        location = __request.scheme.value.lower() + "://" \
-                            + __request.authority + location
+                    return await self.fetch(
+                        response.request.method,
+                        location,
+                        headers=response.request.headers,
+                        body=body,
+                        read_response_body=True,
+                        follow_redirection=True,
+                        max_redirects=_max_redirects - 1,
+                        timeout=_timeout)
 
-                    if response.status_code < 304:
-                        return await self.fetch(
-                            constants.HttpRequestMethod.GET,
-                            location,
-                            follow_redirection=True,
-                            max_redirects=_max_redirects - 1,
-                            timeout=_timeout)
-
-                    else:
-                        body = __request.body
-                        try:
-                            await body.seek_front()
-
-                        except NotImplementedError as e:
-                            raise exceptions.FailedRedirection(
-                                "seek_front is not implemented for"
-                                " current body.") from e
-
-                        return await self.fetch(
-                            response.request.method,
-                            location,
-                            headers=response.request.headers,
-                            body=body,
-                            read_response_body=True,
-                            follow_redirection=True,
-                            max_redirects=_max_redirects - 1,
-                            timeout=_timeout)
-
-            return response
+        return response
 
     async def fetch(
             self, __method: constants.HttpRequestMethod, __url: str,
@@ -206,7 +213,8 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         parsed_url = urllib.parse.urlsplit(__url, scheme="http")
 
@@ -225,7 +233,8 @@ class HttpClient:
             read_response_body=read_response_body,
             timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def head(
             self, __url: str,
@@ -235,14 +244,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.HEAD, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def get(
             self, __url: str,
@@ -252,14 +263,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.GET, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def post(
             self, __url: str,
@@ -269,14 +282,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.POST, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def put(
             self, __url: str,
@@ -286,14 +301,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.PUT, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def delete(
         self, __url: str,
@@ -303,14 +320,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.DELETE, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def options(
             self, __url: str,
@@ -320,14 +339,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.OPTIONS, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def patch(
             self, __url: str,
@@ -337,14 +358,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.PATCH, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def trace(
             self, __url: str,
@@ -354,14 +377,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.TRACE, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
     async def connect(
             self, __url: str,
@@ -371,14 +396,16 @@ class HttpClient:
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
-            max_redirects: Optional[int]=None
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.CONNECT, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects)
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
 
 
 async def head(
@@ -389,13 +416,15 @@ async def head(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().head(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def get(
@@ -406,13 +435,15 @@ async def get(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().get(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def post(
@@ -423,13 +454,15 @@ async def post(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().post(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def put(
@@ -440,13 +473,15 @@ async def put(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().put(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def delete(
@@ -457,13 +492,15 @@ async def delete(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().delete(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def options(
@@ -474,13 +511,15 @@ async def options(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().options(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def patch(
@@ -491,13 +530,15 @@ async def patch(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().patch(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def trace(
@@ -508,13 +549,15 @@ async def trace(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().trace(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
 
 
 async def connect(
@@ -525,10 +568,12 @@ async def connect(
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
-        max_redirects: Optional[int]=None
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().connect(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects)
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)

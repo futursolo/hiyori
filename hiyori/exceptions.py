@@ -29,6 +29,7 @@ __all__ = [
     "BadResponse",
     "ResponseEntityTooLarge",
     "HttpError",
+    "FailedRedirection",
     "TooManyRedirects"]
 
 
@@ -61,13 +62,6 @@ class ResponseEntityTooLarge(BaseHiyoriException):
     pass
 
 
-class FailedRedirection(BaseHiyoriException):
-    """
-    Raised with hiyori cannot fulfill the redirection request.
-    """
-    pass
-
-
 class HttpError(BaseHiyoriException):
     def __init__(self, __response: "messages.Response", *args: Any) -> None:
         self._response = __response
@@ -90,7 +84,14 @@ class HttpError(BaseHiyoriException):
         return self.response.status_code.phrase  # type: ignore
 
 
-class TooManyRedirects(BaseHiyoriException):
+class FailedRedirection(BaseHiyoriException):
+    """
+    Raised with hiyori cannot fulfill the redirection request.
+    """
+    pass
+
+
+class TooManyRedirects(FailedRedirection):
     """
     Raise when the number of redirects exceeds :code:`max_redirect_num`.
     """
