@@ -131,11 +131,9 @@ class HttpClient:
             max_body_size: Optional[int]=None
             ) -> messages.Response:
         _timeout = timeout if timeout is not None else self._timeout
-        _max_redirects = max_redirects or self._max_redirects
         _max_body_size = max_body_size or self._max_body_size
-        conn_id = __request.conn_id
 
-        conn = await self._get_conn(conn_id, timeout=_timeout)
+        conn = await self._get_conn(__request.conn_id, timeout=_timeout)
 
         try:
             response = await asyncio.wait_for(conn._send_request(
@@ -151,58 +149,66 @@ class HttpClient:
         if read_response_body:
             await self._put_conn(conn)
 
-        if follow_redirection:
-            if response.status_code in (301, 302, 303, 307, 308):
-                if _max_redirects == 0:
-                    raise exceptions.TooManyRedirects(response.request)
+        if not follow_redirection or \
+                response.status_code not in (301, 302, 303, 307, 308):
+            return response
 
-                try:
-                    location = response.headers["location"]
+        if max_redirects is None:
+            _max_redirects = self._max_redirects
 
-                except KeyError as e:
-                    raise exceptions.BadResponse(
-                        "Server asked for a redirection; "
-                        "however, did not specify the location."
-                    ) from e
+        else:
+            _max_redirects = max_redirects
 
-                if _ABSOLUTE_PATH_RE.match(location) is None:
-                    raise exceptions.FailedRedirection(
-                        "redirection support for relative path "
-                        "is not implemented.")
+        if _max_redirects == 0:
+            raise exceptions.TooManyRedirects(response.request)
 
-                if location.startswith("/"):
-                    location = __request.scheme.value.lower() + "://" \
-                        + __request.authority + location
+        _max_redirects -= 1
 
-                if response.status_code < 304:
-                    return await self.fetch(
-                        constants.HttpRequestMethod.GET,
-                        location,
-                        follow_redirection=True,
-                        max_redirects=_max_redirects - 1,
-                        timeout=_timeout)
+        try:
+            location = response.headers["location"]
 
-                else:
-                    body = __request.body
-                    try:
-                        await body.seek_front()
+        except KeyError as e:
+            raise exceptions.BadResponse(
+                "Server asked for a redirection; "
+                "however, did not specify the location."
+            ) from e
 
-                    except NotImplementedError as e:
-                        raise exceptions.FailedRedirection(
-                            "seek_front is not implemented for"
-                            " current body.") from e
+        if _ABSOLUTE_PATH_RE.match(location) is None:
+            raise exceptions.FailedRedirection(
+                "Redirection support for relative path "
+                "is not implemented.")
 
-                    return await self.fetch(
-                        response.request.method,
-                        location,
-                        headers=response.request.headers,
-                        body=body,
-                        read_response_body=True,
-                        follow_redirection=True,
-                        max_redirects=_max_redirects - 1,
-                        timeout=_timeout)
+        if location.startswith("/"):
+            location = __request.scheme.value.lower() + "://" \
+                + __request.authority + location
 
-        return response
+        if response.status_code < 304:
+            return await self.fetch(
+                constants.HttpRequestMethod.GET,
+                location,
+                follow_redirection=True,
+                max_redirects=_max_redirects,
+                timeout=_timeout)
+
+        else:
+            body = __request.body
+            try:
+                await body.seek_front()
+
+            except NotImplementedError as e:
+                raise exceptions.FailedRedirection(
+                    "seek_front is not implemented for"
+                    " current body.") from e
+
+            return await self.fetch(
+                response.request.method,
+                location,
+                headers=response.request.headers,
+                body=body,
+                read_response_body=read_response_body,
+                follow_redirection=True,
+                max_redirects=_max_redirects,
+                timeout=_timeout)
 
     async def fetch(
             self, __method: constants.HttpRequestMethod, __url: str,
