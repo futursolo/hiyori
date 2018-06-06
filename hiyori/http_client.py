@@ -239,26 +239,22 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-            read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
             max_redirects: Optional[int]=None,
-            max_body_size: Optional[int]=None
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.HEAD, __url,
-            path_args=path_args, headers=headers, body=body,
-            read_response_body=read_response_body, timeout=timeout,
+            path_args=path_args, headers=headers, body=None,
+            read_response_body=True, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
-            max_body_size=max_body_size)
+            max_body_size=None)
 
     async def get(
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -267,7 +263,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.GET, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=None,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -353,7 +349,6 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -362,7 +357,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.OPTIONS, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=None,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -372,7 +367,6 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -381,7 +375,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.TRACE, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=None,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -392,26 +386,21 @@ async def head(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
         max_redirects: Optional[int]=None,
-        max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().head(
-        __url, path_args=path_args, headers=headers, body=body,
-        read_response_body=read_response_body, timeout=timeout,
+        __url, path_args=path_args, headers=headers,
+        timeout=timeout,
         follow_redirection=follow_redirection,
-        max_redirects=max_redirects,
-        max_body_size=max_body_size)
+        max_redirects=max_redirects)
 
 
 async def get(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -419,7 +408,7 @@ async def get(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().get(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
@@ -506,7 +495,6 @@ async def options(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -514,7 +502,7 @@ async def options(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().options(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
@@ -525,7 +513,6 @@ async def trace(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -533,7 +520,7 @@ async def trace(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().trace(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
