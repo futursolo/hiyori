@@ -91,6 +91,14 @@ class HttpClient:
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
             )-> connection.HttpConnection:
+        if __id in self._conns.keys():
+            conn = self._conns.pop(__id)
+
+            if not conn._closing():
+                return conn
+
+            await conn._close_conn()
+
         if __id.scheme == constants.HttpScheme.HTTPS:
             tls_context: Optional[ssl.SSLContext] = self._tls_context
 
@@ -110,12 +118,14 @@ class HttpClient:
         if self._allow_keep_alive is False:
             await __conn._close_conn()
 
-        if __conn._conn_id in self._conns.keys():
-            old_conn = self._conns.pop(__conn._conn_id)
+            return
 
-            await old_conn._close_conn()
+        if __conn._conn_id not in self._conns.keys():
+            self._conns[__conn._conn_id] = __conn
 
-        self._conns[__conn._conn_id] = __conn
+            return
+
+        await __conn._close_conn()
 
     async def close(self) -> None:
         while self._conns:
