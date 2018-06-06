@@ -43,7 +43,6 @@ __all__ = [
     "delete",
     "head",
     "options",
-    "connect",
     "trace",
     "patch"]
 
@@ -331,25 +330,6 @@ class HttpClient:
             max_redirects=max_redirects,
             max_body_size=max_body_size)
 
-    async def options(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]]=None,
-            headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-            read_response_body: bool=True,
-            timeout: Optional[int]=None,
-            follow_redirection: bool=False,
-            max_redirects: Optional[int]=None,
-            max_body_size: Optional[int]=None
-            ) -> messages.Response:
-        return await self.fetch(
-            constants.HttpRequestMethod.OPTIONS, __url,
-            path_args=path_args, headers=headers, body=body,
-            read_response_body=read_response_body, timeout=timeout,
-            follow_redirection=follow_redirection,
-            max_redirects=max_redirects,
-            max_body_size=max_body_size)
-
     async def patch(
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
@@ -369,6 +349,25 @@ class HttpClient:
             max_redirects=max_redirects,
             max_body_size=max_body_size)
 
+    async def options(
+            self, __url: str,
+            path_args: Optional[Mapping[str, str]]=None,
+            headers: Optional[Mapping[str, str]]=None,
+            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None,
+            follow_redirection: bool=False,
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None
+            ) -> messages.Response:
+        return await self.fetch(
+            constants.HttpRequestMethod.OPTIONS, __url,
+            path_args=path_args, headers=headers, body=body,
+            read_response_body=read_response_body, timeout=timeout,
+            follow_redirection=follow_redirection,
+            max_redirects=max_redirects,
+            max_body_size=max_body_size)
+
     async def trace(
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
@@ -382,25 +381,6 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.TRACE, __url,
-            path_args=path_args, headers=headers, body=body,
-            read_response_body=read_response_body, timeout=timeout,
-            follow_redirection=follow_redirection,
-            max_redirects=max_redirects,
-            max_body_size=max_body_size)
-
-    async def connect(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]]=None,
-            headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-            read_response_body: bool=True,
-            timeout: Optional[int]=None,
-            follow_redirection: bool=False,
-            max_redirects: Optional[int]=None,
-            max_body_size: Optional[int]=None
-            ) -> messages.Response:
-        return await self.fetch(
-            constants.HttpRequestMethod.CONNECT, __url,
             path_args=path_args, headers=headers, body=body,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
@@ -503,25 +483,6 @@ async def delete(
         max_body_size=max_body_size)
 
 
-async def options(
-        __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None,
-        follow_redirection: bool=False,
-        max_redirects: Optional[int]=None,
-        max_body_size: Optional[int]=None
-        ) -> messages.Response:
-    return await HttpClient().options(
-        __url, path_args=path_args, headers=headers, body=body,
-        read_response_body=read_response_body, timeout=timeout,
-        follow_redirection=follow_redirection,
-        max_redirects=max_redirects,
-        max_body_size=max_body_size)
-
-
 async def patch(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
@@ -541,6 +502,25 @@ async def patch(
         max_body_size=max_body_size)
 
 
+async def options(
+        __url: str,
+        path_args: Optional[Mapping[str, str]]=None,
+        headers: Optional[Mapping[str, str]]=None,
+        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        read_response_body: bool=True,
+        timeout: Optional[int]=None,
+        follow_redirection: bool=False,
+        max_redirects: Optional[int]=None,
+        max_body_size: Optional[int]=None
+        ) -> messages.Response:
+    return await HttpClient().options(
+        __url, path_args=path_args, headers=headers, body=body,
+        read_response_body=read_response_body, timeout=timeout,
+        follow_redirection=follow_redirection,
+        max_redirects=max_redirects,
+        max_body_size=max_body_size)
+
+
 async def trace(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
@@ -553,25 +533,6 @@ async def trace(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().trace(
-        __url, path_args=path_args, headers=headers, body=body,
-        read_response_body=read_response_body, timeout=timeout,
-        follow_redirection=follow_redirection,
-        max_redirects=max_redirects,
-        max_body_size=max_body_size)
-
-
-async def connect(
-        __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None,
-        follow_redirection: bool=False,
-        max_redirects: Optional[int]=None,
-        max_body_size: Optional[int]=None
-        ) -> messages.Response:
-    return await HttpClient().connect(
         __url, path_args=path_args, headers=headers, body=body,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
