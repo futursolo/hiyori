@@ -51,136 +51,138 @@ class HttpConnectionId(NamedTuple):
         return self.authority.split(":", 1)[0]
 
 
-class HttpConnection(magichttp.HttpClientProtocol):  # type: ignore
+class HttpConnection:
     def __init__(
-            self, conn_id: HttpConnectionId, chunk_size: int,
+        self, __conn_id: HttpConnectionId, *, max_initial_size: int,
+            chunk_size: int, tls_context: Optional[ssl.SSLContext],
             idle_timeout: int) -> None:
-        super().__init__(http_version=conn_id.http_version)
+        self.conn_id = __conn_id
 
-        self._conn_lost_event = asyncio.Event()
-
-        self._conn_id = conn_id
+        self._max_initial_size = max_initial_size
         self._chunk_size = chunk_size
+        self._tls_context = tls_context
         self._idle_timeout = idle_timeout
 
         self._idle_timer: Optional[asyncio.Handle] = None
+        self._set_idle_timeout()
+
+        self._protocol: Optional[magichttp.HttpClientProtocol] = None
+        self._closing = asyncio.Event()
 
     def _set_idle_timeout(self) -> None:
-        if self._idle_timer is not None:
-            self._cancel_idle_timeout()
+        self._cancel_idle_timeout()
 
         loop = asyncio.get_event_loop()
-        self._idle_timer = loop.call_later(
-            self._idle_timeout, self.transport.close)
+        self._idle_timer = loop.call_later(self._idle_timeout, self.close)
 
     def _cancel_idle_timeout(self) -> None:
         if self._idle_timer is not None:
             self._idle_timer.cancel()
             self._idle_timer = None
 
-    async def _send_request(
-        self, __request: "messages.PendingRequest", *,
-            read_response_body: bool,
-            max_body_size: int) -> "messages.Response":
-        try:
-            self._cancel_idle_timeout()
-            if "content-length" not in __request.headers.keys():
-                try:
-                    body_len = await __request.body.calc_len()
+    async def get_ready(self)-> None:
+        self._cancel_idle_timeout()
 
-                except NotImplementedError:
-                    __request.headers.setdefault(
-                        "transfer-encoding", "chunked")
+        if self.closing():
+            raise RuntimeError("This connection is closing.")
 
-                if body_len > 0:
-                    __request.headers.setdefault(
-                        "content-length", str(body_len))
+        if self._protocol is not None and \
+                not self._protocol.transport.is_closing():
+            return
 
-            try:
-                writer = await self.write_request(
-                    __request.method,
-                    uri=__request.uri,
-                    authority=__request.authority,
-                    headers=__request.headers)
+        def create_conn() -> "asyncio.Protocol":
+            class _Protocol(magichttp.HttpClientProtocol):  # type: ignore
+                MAX_INITIAL_SIZE = self._max_initial_size
 
-                while True:
-                    try:
-                        body_chunk = await __request.body.read(
-                            self._chunk_size)
-
-                    except EOFError:
-                        break
-
-                    writer.write(body_chunk)
-                    await writer.flush()
-
-                writer.finish()
-
-                reader = await writer.read_response()
-
-                try:
-                    res_body = await reader.read(max_body_size + 1)
-
-                except magichttp.ReadFinishedError:
-                    res_body = b""
-
-                if len(res_body) > max_body_size:
-                    raise exceptions.ResponseEntityTooLarge(
-                        "Response body is too large.")
-
-            except (magichttp.ReadAbortedError,
-                    magichttp.WriteAbortedError,
-                    magichttp.WriteAfterFinishedError) as e:
-                raise exceptions.ConnectionClosed("Connection closed.") from e
-
-            self._set_idle_timeout()
-
-            return messages.Response(
-                messages.Request(writer), reader=reader, body=res_body)
-
-        except magichttp.EntityTooLargeError as e:
-            self.transport.close()
-
-            raise exceptions.ResponseEntityTooLarge from e
-
-        except Exception:
-            self.transport.close()
-
-            raise
-
-    async def _close_conn(self) -> None:
-        self.transport.close()
-
-        await self._conn_lost_event.wait()
-
-    def _closing(self) -> bool:
-        return typing.cast(bool, self.transport.is_closing())
-
-    def connection_lost(self, exc: Optional[Exception]) -> None:
-        super().connection_lost(exc)
-
-        self._conn_lost_event.set()
-
-    @staticmethod
-    async def connect(
-            __id: HttpConnectionId, timeout: int,
-            tls_context: Optional[ssl.SSLContext],
-            chunk_size: int, idle_timeout: int)-> "HttpConnection":
-        def create_conn() -> "HttpConnection":
-            return HttpConnection(
-                conn_id=__id, chunk_size=chunk_size, idle_timeout=idle_timeout)
+            return typing.cast(
+                asyncio.Protocol, _Protocol(self.conn_id.http_version))
 
         loop = asyncio.get_event_loop()
 
+        _, self._protocol = await loop.create_connection(
+            create_conn,
+            host=self.conn_id.hostname,
+            port=self.conn_id.port,
+
+            ssl=self._tls_context,
+            server_hostname=self.conn_id.hostname)
+
+    async def send_request(
+        self, __request: "messages.PendingRequest", *,
+            read_response_body: bool,
+            max_body_size: int) -> "messages.Response":
+        await self.get_ready()
+        assert self._protocol is not None
+
+        if "content-length" not in __request.headers.keys():
+            try:
+                body_len = await __request.body.calc_len()
+
+            except NotImplementedError:
+                __request.headers.setdefault("transfer-encoding", "chunked")
+
+            if body_len > 0:
+                __request.headers.setdefault("content-length", str(body_len))
+
         try:
-            _, conn = await asyncio.wait_for(
-                loop.create_connection(
-                    create_conn, __id.hostname, __id.port,
-                    ssl=tls_context, server_hostname=__id.hostname),
-                timeout)
+            writer = await self._protocol.write_request(
+                __request.method,
+                uri=__request.uri,
+                authority=__request.authority,
+                headers=__request.headers)
 
-        except asyncio.TimeoutError as e:
-            raise exceptions.RequestTimeout(
-                "Failed to connect to remote host.") from e
+            while True:
+                try:
+                    body_chunk = await __request.body.read(self._chunk_size)
 
-        return typing.cast(HttpConnection, conn)
+                except EOFError:
+                    break
+
+                writer.write(body_chunk)
+                await writer.flush()
+
+            writer.finish()
+            reader = await writer.read_response()
+
+            try:
+                res_body = await reader.read(max_body_size + 1)
+
+            except magichttp.ReadFinishedError:
+                res_body = b""
+
+            if len(res_body) > max_body_size:
+                raise exceptions.ResponseEntityTooLarge(
+                    "Response body is too large.")
+
+        except (magichttp.ReadAbortedError,
+                magichttp.WriteAbortedError,
+                magichttp.WriteAfterFinishedError) as e:
+            raise exceptions.ConnectionClosed("Connection closed.") from e
+
+        except magichttp.ReceivedDataMalformedError as e:
+            raise exceptions.BadResponse from e
+
+        except magichttp.EntityTooLargeError as e:
+            self.close()
+
+            raise exceptions.ResponseEntityTooLarge from e
+
+        self._set_idle_timeout()
+
+        return messages.Response(
+            messages.Request(writer), reader=reader, body=res_body)
+
+    def close(self) -> None:
+        self._closing.set()
+
+        if self._protocol is not None:
+            self._protocol.close()
+
+    async def wait_closed(self) -> None:
+        await self._closing.wait()
+
+        if self._protocol is not None:
+            await self._protocol.wait_closed()
+
+    def closing(self) -> bool:
+        return self._closing.is_set()

@@ -83,21 +83,17 @@ class HttpClient:
             connection.HttpConnectionId, connection.HttpConnection] = \
             collections.OrderedDict()
 
-        class _HttpConnection(connection.HttpConnection):
-            _MAX_INITIAL_SIZE = self._max_initial_size
-
-        self._HttpConnection = _HttpConnection
-
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
             )-> connection.HttpConnection:
         if __id in self._conns.keys():
             conn = self._conns.pop(__id)
 
-            if not conn._closing():
+            if not conn.closing():
                 return conn
 
-            await conn._close_conn()
+            conn.close()
+            await conn.wait_closed()
 
         if __id.scheme == constants.HttpScheme.HTTPS:
             tls_context: Optional[ssl.SSLContext] = self._tls_context
@@ -105,32 +101,31 @@ class HttpClient:
         else:
             tls_context = None
 
-        return await self._HttpConnection.connect(
-            __id, timeout=timeout, tls_context=tls_context,
-            chunk_size=self._chunk_size, idle_timeout=self._idle_timeout)
+        return connection.HttpConnection(
+            __id, max_initial_size=self._max_initial_size,
+            tls_context=tls_context, chunk_size=self._chunk_size,
+            idle_timeout=self._idle_timeout)
 
     async def _put_conn(self, __conn: connection.HttpConnection) -> None:
-        if __conn._closing():
-            await __conn._close_conn()
+        if __conn.closing() or self._allow_keep_alive is False:
+            __conn.close()
+            await __conn.wait_closed()
 
             return
 
-        if self._allow_keep_alive is False:
-            await __conn._close_conn()
+        if __conn.conn_id not in self._conns.keys():
+            self._conns[__conn.conn_id] = __conn
 
             return
 
-        if __conn._conn_id not in self._conns.keys():
-            self._conns[__conn._conn_id] = __conn
-
-            return
-
-        await __conn._close_conn()
+        __conn.close()
+        await __conn.wait_closed()
 
     async def close(self) -> None:
         while self._conns:
             _, conn = self._conns.popitem()
-            await conn._close_conn()
+            conn.close()
+            await conn.wait_closed()
 
     async def send_request(
             self, __request: messages.PendingRequest, *,
@@ -146,13 +141,14 @@ class HttpClient:
         conn = await self._get_conn(__request.conn_id, timeout=_timeout)
 
         try:
-            response = await asyncio.wait_for(conn._send_request(
+            response = await asyncio.wait_for(conn.send_request(
                 __request, read_response_body=read_response_body,
                 max_body_size=_max_body_size),
                 _timeout)
 
         except asyncio.TimeoutError as e:
-            await conn._close_conn()
+            conn.close()
+            await conn.wait_closed()
 
             raise exceptions.RequestTimeout from e
 
