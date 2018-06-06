@@ -15,24 +15,21 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import MutableMapping, Optional, Mapping, Union
+from typing import MutableMapping, Optional, Mapping, Union, Dict
 from typing import Awaitable  # noqa: F401
 
 from . import messages
 from . import exceptions
 from . import constants
 from . import connection
+from . import bodies
 
 import ssl
 import collections
 import asyncio
 import urllib.parse
 import magicdict
-import typing
 import re
-
-if typing.TYPE_CHECKING:
-    from . import bodies  # noqa: F401
 
 __all__ = [
     "HttpClient",
@@ -47,6 +44,8 @@ __all__ = [
     "patch"]
 
 _ABSOLUTE_PATH_RE = re.compile("^(http:/|https:/)?/")
+
+_BODY = Union[bytes, bodies.BaseRequestBody, Dict[str, str]]
 
 
 class HttpClient:
@@ -220,7 +219,7 @@ class HttpClient:
             self, __method: constants.HttpRequestMethod, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            body: Optional[_BODY]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -234,10 +233,20 @@ class HttpClient:
         if parsed_url.query:
             final_path_args.update(urllib.parse.parse_qsl(parsed_url.query))
 
+        if isinstance(body, dict):
+            body = bodies.UrlEncodedRequestBody(body)
+            content_type: Optional[str] = "application/x-www-form-urlencoded"
+
+        else:
+            content_type = None
+
         request = messages.PendingRequest(
             __method, authority=parsed_url.netloc, path=parsed_url.path or "/",
             path_args=final_path_args, scheme=parsed_url.scheme,
             headers=headers, version=constants.HttpVersion.V1_1, body=body)
+
+        if content_type:
+            request.headers.setdefault("content-type", content_type)
 
         return await self.send_request(
             request,
@@ -285,7 +294,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            body: Optional[_BODY]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -304,7 +313,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            body: Optional[_BODY]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -323,7 +332,7 @@ class HttpClient:
         self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            body: Optional[_BODY]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -342,7 +351,7 @@ class HttpClient:
             self, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
-            body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+            body: Optional[_BODY]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -431,7 +440,7 @@ async def post(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        body: Optional[_BODY]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -450,7 +459,7 @@ async def put(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        body: Optional[_BODY]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -469,7 +478,7 @@ async def delete(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        body: Optional[_BODY]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -488,7 +497,7 @@ async def patch(
         __url: str,
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
-        body: Optional[Union[bytes, "bodies.BaseRequestBody"]]=None,
+        body: Optional[_BODY]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,

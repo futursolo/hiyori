@@ -15,15 +15,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Union, Dict, List, Any
+from typing import Union, Dict, List, Any, Mapping
 
 import abc
 import io
 import json
+import urllib.parse
 
 __all__ = [
     "BaseRequestBody",
     "BytesRequestBody",
+    "UrlEncodedRequestBody",
     "ResponseBody"]
 
 
@@ -72,6 +74,11 @@ class BytesRequestBody(BaseRequestBody):
             raise EOFError
 
         return data
+
+
+class UrlEncodedRequestBody(BytesRequestBody):
+    def __init__(self, __map: Mapping[str, str]) -> None:
+        super().__init__(urllib.parse.urlencode(__map).encode())
 
 
 class _EmptyRequestBody(BaseRequestBody):
