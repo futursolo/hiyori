@@ -15,8 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import MutableMapping, Optional, Mapping, Union, Dict
-from typing import Awaitable  # noqa: F401
+from typing import MutableMapping, Optional, Mapping, Union, Dict, Any
 
 from . import messages
 from . import exceptions
@@ -220,14 +219,17 @@ class HttpClient:
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
             body: Optional[_BODY]=None,
+            json: Optional[Any]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
             max_redirects: Optional[int]=None,
             max_body_size: Optional[int]=None
             ) -> messages.Response:
-        parsed_url = urllib.parse.urlsplit(__url, scheme="http")
+        if None not in (body, json):
+            raise ValueError("You cannot both body and json supplied.")
 
+        parsed_url = urllib.parse.urlsplit(__url, scheme="http")
         final_path_args = magicdict.TolerantMagicDict(path_args or {})
 
         if parsed_url.query:
@@ -236,6 +238,10 @@ class HttpClient:
         if isinstance(body, dict):
             body = bodies.UrlEncodedRequestBody(body)
             content_type: Optional[str] = "application/x-www-form-urlencoded"
+
+        elif json is not None:
+            body = bodies.JsonRequestBody(json)
+            content_type = "application/json"
 
         else:
             content_type = None

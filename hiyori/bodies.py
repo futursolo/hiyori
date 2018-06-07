@@ -26,6 +26,7 @@ __all__ = [
     "BaseRequestBody",
     "BytesRequestBody",
     "UrlEncodedRequestBody",
+    "JsonRequestBody",
     "ResponseBody"]
 
 
@@ -79,6 +80,11 @@ class BytesRequestBody(BaseRequestBody):
 class UrlEncodedRequestBody(BytesRequestBody):
     def __init__(self, __map: Mapping[str, str]) -> None:
         super().__init__(urllib.parse.urlencode(__map).encode())
+
+
+class JsonRequestBody(BytesRequestBody):
+    def __init__(self, json_obj: Any) -> None:
+        super().__init__(json.dumps(json_obj).encode("utf-8"))
 
 
 class _EmptyRequestBody(BaseRequestBody):
