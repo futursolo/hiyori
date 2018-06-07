@@ -272,11 +272,9 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.HEAD, __url,
-            path_args=path_args, headers=headers, body=None,
-            read_response_body=True, timeout=timeout,
+            path_args=path_args, headers=headers, timeout=timeout,
             follow_redirection=follow_redirection,
-            max_redirects=max_redirects,
-            max_body_size=None)
+            max_redirects=max_redirects)
 
     async def get(
             self, __url: str,
@@ -290,7 +288,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.GET, __url,
-            path_args=path_args, headers=headers, body=None,
+            path_args=path_args, headers=headers,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -301,6 +299,7 @@ class HttpClient:
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
             body: Optional[_BODY]=None,
+            json: Optional[Any]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -309,7 +308,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.POST, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=body, json=json,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -320,6 +319,7 @@ class HttpClient:
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
             body: Optional[_BODY]=None,
+            json: Optional[Any]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -328,7 +328,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.PUT, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=body, json=json,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -339,6 +339,7 @@ class HttpClient:
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
             body: Optional[_BODY]=None,
+            json: Optional[Any]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -347,7 +348,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.DELETE, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=body, json=json,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -358,6 +359,7 @@ class HttpClient:
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
             body: Optional[_BODY]=None,
+            json: Optional[Any]=None,
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -366,7 +368,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.PATCH, __url,
-            path_args=path_args, headers=headers, body=body,
+            path_args=path_args, headers=headers, body=body, json=json,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -384,7 +386,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.OPTIONS, __url,
-            path_args=path_args, headers=headers, body=None,
+            path_args=path_args, headers=headers,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -402,7 +404,7 @@ class HttpClient:
             ) -> messages.Response:
         return await self.fetch(
             constants.HttpRequestMethod.TRACE, __url,
-            path_args=path_args, headers=headers, body=None,
+            path_args=path_args, headers=headers,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
@@ -447,6 +449,7 @@ async def post(
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
         body: Optional[_BODY]=None,
+        json: Optional[Any]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -454,7 +457,7 @@ async def post(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().post(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers, body=body, json=json,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
@@ -466,6 +469,7 @@ async def put(
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
         body: Optional[_BODY]=None,
+        json: Optional[Any]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -473,7 +477,7 @@ async def put(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().put(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers, body=body, json=json,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
@@ -485,6 +489,7 @@ async def delete(
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
         body: Optional[_BODY]=None,
+        json: Optional[Any]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -492,7 +497,7 @@ async def delete(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().delete(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers, body=body, json=json,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
@@ -504,6 +509,7 @@ async def patch(
         path_args: Optional[Mapping[str, str]]=None,
         headers: Optional[Mapping[str, str]]=None,
         body: Optional[_BODY]=None,
+        json: Optional[Any]=None,
         read_response_body: bool=True,
         timeout: Optional[int]=None,
         follow_redirection: bool=False,
@@ -511,7 +517,7 @@ async def patch(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().patch(
-        __url, path_args=path_args, headers=headers, body=body,
+        __url, path_args=path_args, headers=headers, body=body, json=json,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
