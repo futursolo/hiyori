@@ -19,14 +19,12 @@ from typing import NamedTuple, Optional
 
 from . import messages
 from . import exceptions
+from . import constants
 
 import asyncio
 import typing
 import magichttp
 import ssl
-
-if typing.TYPE_CHECKING:
-    from . import constants  # noqa: F401
 
 
 class HttpConnectionId(NamedTuple):
@@ -94,8 +92,8 @@ class HttpConnection:
             class _Protocol(magichttp.HttpClientProtocol):  # type: ignore
                 MAX_INITIAL_SIZE = self._max_initial_size
 
-            return typing.cast(
-                asyncio.Protocol, _Protocol(self.conn_id.http_version))
+            return typing.cast(asyncio.Protocol, _Protocol(
+                http_version=self.conn_id.http_version))
 
         loop = asyncio.get_event_loop()
 
