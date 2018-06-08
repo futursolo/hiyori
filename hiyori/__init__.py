@@ -21,6 +21,7 @@ from .exceptions import *  # noqa: F401, F403
 from .http_client import *  # noqa: F401, F403
 from ._version import *  # noqa: F401, F403
 from .bodies import *  # noqa: F401, F403
+from .multipart import *  # noqa: F401, F403
 
 from . import constants
 from . import messages
@@ -28,6 +29,7 @@ from . import exceptions
 from . import http_client
 from . import _version
 from . import bodies
+from . import multipart
 
 __all__ = constants.__all__ + messages.__all__ + exceptions.__all__ + \
-    http_client.__all__ + _version.__all__ + bodies.__all__
+    http_client.__all__ + _version.__all__ + bodies.__all__ + multipart.__all__
