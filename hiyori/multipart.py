@@ -41,13 +41,60 @@ class _StrField(bodies.BytesRequestBody):
 
 
 class _FileField(bodies.BaseRequestBody):
-    pass
+    def __init__(
+        self, __fp: BinaryIO,
+            headers: Mapping[str, str], prefix: bytes) -> None:
+        self._fp = __fp
+        self._headers = headers
+
+        self._first_prefix = prefix
+        self._raw_prefix: Optional[bytes] = None
+
+        self._lock = asyncio.Lock()
+
+        self._ptr = 0
+
+    @property
+    def _prefix(self) -> bytes:
+        if self._raw_prefix is None:
+            buf = bytearray(self._first_prefix)
+
+            for name, value in self._headers.items():
+                buf += "{}: {}\r\n".format(name.title(), value).encode("utf-8")
+
+            buf += b"\r\n"
+
+            self._raw_prefix = bytes(buf)
+
+        return self._raw_prefix
+
+    async def calc_len(self) -> int:
+        async with self._lock:
+            self._fp.seek(0, io.SEEK_END)
+
+            return len(self._prefix) + self._fp.tell()
+
+    async def seek_front(self) -> None:
+        self._ptr = 0
+
+    async def read(self, n: int) -> bytes:
+        async with self._lock:
+            if self._ptr < len(self._prefix):
+                part = self._prefix[self._ptr:self._ptr+n]
+                self._ptr += n
+                return part
+
+            part = self._fp.read(n)
+
+            if not part:
+                raise EOFError
+
+            return part
 
 
 class File:
     def __init__(
         self, __fp: Union[BinaryIO, bytes],
-
         filename: Optional[str]=None,
         content_type: Optional[str]=None,
             headers: Optional[Mapping[str, str]]=None) -> None:
@@ -58,24 +105,39 @@ class File:
             self._fp = __fp
 
         self._filename = filename
-
-        if not content_type:
-            if not self._filename:
-                self._content_type = "application/octet-stream"
-
-            else:
-                guess_result = mimetypes.guess_type(self._filename)
-
-                if guess_result[0] is None:
-                    self._content_type = "application/octet-stream"
-
-                else:
-                    self._content_type = guess_result[0]
+        self._content_type = content_type
 
         self._headers = magicdict.TolerantMagicDict(headers or {})
+        self._headers.setdefault("content-type", self._content_type)
 
     def _to_file_field(self, name: str, prefix: bytes) -> _FileField:
-        raise NotImplementedError
+        if "content-type" not in self._headers.keys():
+            if not self._content_type:
+                if not self._filename:
+                    content_type = "application/octet-stream"
+
+                else:
+                    guess_result = mimetypes.guess_type(self._filename)
+
+                    if guess_result[0] is None:
+                        content_type = "application/octet-stream"
+
+                    else:
+                        content_type = guess_result[0]
+
+            else:
+                content_type = self._content_type
+
+            self._headers["content-type"] = content_type
+
+        disposition = ["form-data", "name=\"{}\"".format(name)]
+
+        if self._filename:
+            disposition.append("filename=\"{}\"".format(self._filename))
+
+        self._headers["content-disposition"] = "; ".join(disposition)
+
+        return _FileField(self._fp, self._headers, prefix)
 
 
 class MultipartRequestBody(bodies.BaseRequestBody):
@@ -96,7 +158,8 @@ class MultipartRequestBody(bodies.BaseRequestBody):
                 self._fields.append(value._to_file_field(name, field_prefix))
 
             else:
-                raise NotImplementedError
+                self._fields.append(
+                    File(value)._to_file_field(name, field_prefix))
 
         self._body_len: Optional[int] = None
         self._ptr = 0
@@ -153,7 +216,7 @@ class MultipartRequestBody(bodies.BaseRequestBody):
             if affix_pos >= len(self._affix):
                 raise EOFError
 
-            affix_part = self._affix[affix_pos:n]
+            affix_part = self._affix[affix_pos:affix_pos + n]
             self._ptr -= len(affix_part)
 
             return affix_part
