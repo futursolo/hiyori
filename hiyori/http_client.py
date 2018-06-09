@@ -41,7 +41,6 @@ __all__ = [
     "delete",
     "head",
     "options",
-    "trace",
     "patch"]
 
 _ABSOLUTE_PATH_RE = re.compile("^(http:/|https:/)?/")
@@ -402,24 +401,6 @@ class HttpClient:
             max_redirects=max_redirects,
             max_body_size=max_body_size)
 
-    async def trace(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]]=None,
-            headers: Optional[Mapping[str, str]]=None,
-            read_response_body: bool=True,
-            timeout: Optional[int]=None,
-            follow_redirection: bool=False,
-            max_redirects: Optional[int]=None,
-            max_body_size: Optional[int]=None
-            ) -> messages.Response:
-        return await self.fetch(
-            constants.HttpRequestMethod.TRACE, __url,
-            path_args=path_args, headers=headers,
-            read_response_body=read_response_body, timeout=timeout,
-            follow_redirection=follow_redirection,
-            max_redirects=max_redirects,
-            max_body_size=max_body_size)
-
 
 async def head(
         __url: str,
@@ -545,24 +526,6 @@ async def options(
         max_body_size: Optional[int]=None
         ) -> messages.Response:
     return await HttpClient().options(
-        __url, path_args=path_args, headers=headers,
-        read_response_body=read_response_body, timeout=timeout,
-        follow_redirection=follow_redirection,
-        max_redirects=max_redirects,
-        max_body_size=max_body_size)
-
-
-async def trace(
-        __url: str,
-        path_args: Optional[Mapping[str, str]]=None,
-        headers: Optional[Mapping[str, str]]=None,
-        read_response_body: bool=True,
-        timeout: Optional[int]=None,
-        follow_redirection: bool=False,
-        max_redirects: Optional[int]=None,
-        max_body_size: Optional[int]=None
-        ) -> messages.Response:
-    return await HttpClient().trace(
         __url, path_args=path_args, headers=headers,
         read_response_body=read_response_body, timeout=timeout,
         follow_redirection=follow_redirection,
