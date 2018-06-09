@@ -15,13 +15,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import MutableMapping, Optional, Mapping, Union, Dict, Any
+from typing import MutableMapping, Optional, Mapping, Union, Dict, Any, \
+     BinaryIO
 
 from . import messages
 from . import exceptions
 from . import constants
 from . import connection
 from . import bodies
+from . import multipart
 
 import ssl
 import collections
@@ -44,7 +46,8 @@ __all__ = [
 
 _ABSOLUTE_PATH_RE = re.compile("^(http:/|https:/)?/")
 
-_BODY = Union[bytes, bodies.BaseRequestBody, Dict[str, str]]
+_BODY = Union[bytes, bodies.BaseRequestBody,
+              Dict[str, Union[str, BinaryIO, multipart.File]]]
 
 
 class HttpClient:
@@ -236,8 +239,15 @@ class HttpClient:
             final_path_args.update(urllib.parse.parse_qsl(parsed_url.query))
 
         if isinstance(body, dict):
-            body = bodies.UrlEncodedRequestBody(body)
-            content_type: Optional[str] = "application/x-www-form-urlencoded"
+            for v in body.values():
+                if not isinstance(v, str):
+                    body = multipart.MultipartRequestBody(body)
+                    content_type: Optional[str] = body.content_type
+
+                    break
+            else:
+                body = bodies.UrlEncodedRequestBody(body)  # type: ignore
+                content_type = "application/x-www-form-urlencoded"
 
         elif json is not None:
             body = bodies.JsonRequestBody(json)
