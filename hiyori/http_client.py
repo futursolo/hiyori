@@ -16,7 +16,7 @@
 #   limitations under the License.
 
 from typing import MutableMapping, Optional, Mapping, Union, Dict, Any, \
-     BinaryIO
+     BinaryIO, List
 
 from . import messages
 from . import exceptions
@@ -47,6 +47,48 @@ _ABSOLUTE_PATH_RE = re.compile("^(http:/|https:/)?/")
 
 _BODY = Union[bytes, bodies.BaseRequestBody,
               Dict[str, Union[str, BinaryIO, multipart.File]]]
+
+
+class _ReadLock:
+    def __init__(self, client_lock: "_ClientLock") -> None:
+        self._idling = asyncio.Event()
+        self._count = 0
+
+        self._client_lock = client_lock
+
+    def __enter__(self) -> None:
+        if self._client_lock.close_lock._closing:
+            raise RuntimeError("Client is closing.")
+
+        self._count += 1
+        self._idling.clear()
+
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
+        self._count -= 1
+
+        if self._count == 0:
+            self._idling.set()
+
+
+class _CloseLock:
+    def __init__(self, client_lock: "_ClientLock") -> None:
+        self._closing = False
+
+        self._client_lock = client_lock
+
+    async def __aenter__(self) -> None:
+        self._closing = True
+
+        await self._client_lock.read_lock._idling.wait()
+
+    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+
+class _ClientLock:
+    def __init__(self) -> None:
+        self.read_lock = _ReadLock(self)
+        self.close_lock = _CloseLock(self)
 
 
 class HttpClient:
@@ -82,6 +124,8 @@ class HttpClient:
         self._conns: MutableMapping[
             connection.HttpConnectionId, connection.HttpConnection] = \
             collections.OrderedDict()
+
+        self._lock = _ClientLock()
 
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
@@ -122,10 +166,17 @@ class HttpClient:
         await __conn.wait_closed()
 
     async def close(self) -> None:
-        while self._conns:
-            _, conn = self._conns.popitem()
-            conn.close()
-            await conn.wait_closed()
+        async with self._lock.close_lock:
+            tasks: List["asyncio.Task[None]"] = []
+
+            loop = asyncio.get_event_loop()
+
+            while self._conns:
+                _, conn = self._conns.popitem()
+                conn.close()
+                tasks.append(loop.create_task(conn.wait_closed()))
+
+            await asyncio.wait(tasks)
 
     async def send_request(
             self, __request: messages.PendingRequest, *,
@@ -135,86 +186,87 @@ class HttpClient:
             max_redirects: Optional[int]=None,
             max_body_size: Optional[int]=None
             ) -> messages.Response:
-        _timeout = timeout if timeout is not None else self._timeout
-        _max_body_size = max_body_size or self._max_body_size
+        with self._lock.read_lock:
+            _timeout = timeout if timeout is not None else self._timeout
+            _max_body_size = max_body_size or self._max_body_size
 
-        conn = await self._get_conn(__request.conn_id, timeout=_timeout)
+            conn = await self._get_conn(__request.conn_id, timeout=_timeout)
 
-        try:
-            response = await asyncio.wait_for(conn.send_request(
-                __request, read_response_body=read_response_body,
-                max_body_size=_max_body_size),
-                _timeout)
-
-        except asyncio.TimeoutError as e:
-            conn.close()
-            await conn.wait_closed()
-
-            raise exceptions.RequestTimeout from e
-
-        if read_response_body:
-            await self._put_conn(conn)
-
-        if not follow_redirection or \
-                response.status_code not in (301, 302, 303, 307, 308):
-            return response
-
-        if max_redirects is None:
-            _max_redirects = self._max_redirects
-
-        else:
-            _max_redirects = max_redirects
-
-        if _max_redirects == 0:
-            raise exceptions.TooManyRedirects(response.request)
-
-        _max_redirects -= 1
-
-        try:
-            location = response.headers["location"]
-
-        except KeyError as e:
-            raise exceptions.BadResponse(
-                "Server asked for a redirection; "
-                "however, did not specify the location."
-            ) from e
-
-        if _ABSOLUTE_PATH_RE.match(location) is None:
-            raise exceptions.FailedRedirection(
-                "Redirection support for relative path "
-                "is not implemented.")
-
-        if location.startswith("/"):
-            location = __request.scheme.value.lower() + "://" \
-                + __request.authority + location
-
-        if response.status_code < 304:
-            return await self.fetch(
-                constants.HttpRequestMethod.GET,
-                location,
-                follow_redirection=True,
-                max_redirects=_max_redirects,
-                timeout=_timeout)
-
-        else:
-            body = __request.body
             try:
-                await body.seek_front()
+                response = await asyncio.wait_for(conn.send_request(
+                    __request, read_response_body=read_response_body,
+                    max_body_size=_max_body_size),
+                    _timeout)
 
-            except NotImplementedError as e:
+            except asyncio.TimeoutError as e:
+                conn.close()
+                await conn.wait_closed()
+
+                raise exceptions.RequestTimeout from e
+
+            if read_response_body:
+                await self._put_conn(conn)
+
+            if not follow_redirection or \
+                    response.status_code not in (301, 302, 303, 307, 308):
+                return response
+
+            if max_redirects is None:
+                _max_redirects = self._max_redirects
+
+            else:
+                _max_redirects = max_redirects
+
+            if _max_redirects == 0:
+                raise exceptions.TooManyRedirects(response.request)
+
+            _max_redirects -= 1
+
+            try:
+                location = response.headers["location"]
+
+            except KeyError as e:
+                raise exceptions.BadResponse(
+                    "Server asked for a redirection; "
+                    "however, did not specify the location."
+                ) from e
+
+            if _ABSOLUTE_PATH_RE.match(location) is None:
                 raise exceptions.FailedRedirection(
-                    "seek_front is not implemented for"
-                    " current body.") from e
+                    "Redirection support for relative path "
+                    "is not implemented.")
 
-            return await self.fetch(
-                response.request.method,
-                location,
-                headers=response.request.headers,
-                body=body,
-                read_response_body=read_response_body,
-                follow_redirection=True,
-                max_redirects=_max_redirects,
-                timeout=_timeout)
+            if location.startswith("/"):
+                location = __request.scheme.value.lower() + "://" \
+                    + __request.authority + location
+
+            if response.status_code < 304:
+                return await self.fetch(
+                    constants.HttpRequestMethod.GET,
+                    location,
+                    follow_redirection=True,
+                    max_redirects=_max_redirects,
+                    timeout=_timeout)
+
+            else:
+                body = __request.body
+                try:
+                    await body.seek_front()
+
+                except NotImplementedError as e:
+                    raise exceptions.FailedRedirection(
+                        "seek_front is not implemented for"
+                        " current body.") from e
+
+                return await self.fetch(
+                    response.request.method,
+                    location,
+                    headers=response.request.headers,
+                    body=body,
+                    read_response_body=read_response_body,
+                    follow_redirection=True,
+                    max_redirects=_max_redirects,
+                    timeout=_timeout)
 
     async def fetch(
             self, __method: constants.HttpRequestMethod, __url: str,
@@ -228,48 +280,51 @@ class HttpClient:
             max_redirects: Optional[int]=None,
             max_body_size: Optional[int]=None
             ) -> messages.Response:
-        if None not in (body, json):
-            raise ValueError("You cannot both body and json supplied.")
+        with self._lock.read_lock:
+            if None not in (body, json):
+                raise ValueError("You cannot both body and json supplied.")
 
-        parsed_url = urllib.parse.urlsplit(__url, scheme="http")
-        final_path_args = magicdict.TolerantMagicDict(path_args or {})
+            parsed_url = urllib.parse.urlsplit(__url, scheme="http")
+            final_path_args = magicdict.TolerantMagicDict(path_args or {})
 
-        if parsed_url.query:
-            final_path_args.update(urllib.parse.parse_qsl(parsed_url.query))
+            if parsed_url.query:
+                final_path_args.update(
+                    urllib.parse.parse_qsl(parsed_url.query))
 
-        if isinstance(body, dict):
-            for v in body.values():
-                if not isinstance(v, str):
-                    body = multipart.MultipartRequestBody(body)
-                    content_type: Optional[str] = body.content_type
+            if isinstance(body, dict):
+                for v in body.values():
+                    if not isinstance(v, str):
+                        body = multipart.MultipartRequestBody(body)
+                        content_type: Optional[str] = body.content_type
 
-                    break
+                        break
+                else:
+                    body = bodies.UrlEncodedRequestBody(body)  # type: ignore
+                    content_type = "application/x-www-form-urlencoded"
+
+            elif json is not None:
+                body = bodies.JsonRequestBody(json)
+                content_type = "application/json"
+
             else:
-                body = bodies.UrlEncodedRequestBody(body)  # type: ignore
-                content_type = "application/x-www-form-urlencoded"
+                content_type = None
 
-        elif json is not None:
-            body = bodies.JsonRequestBody(json)
-            content_type = "application/json"
+            request = messages.PendingRequest(
+                __method, authority=parsed_url.netloc,
+                path=parsed_url.path or "/",
+                path_args=final_path_args, scheme=parsed_url.scheme,
+                headers=headers, version=constants.HttpVersion.V1_1, body=body)
 
-        else:
-            content_type = None
+            if content_type:
+                request.headers.setdefault("content-type", content_type)
 
-        request = messages.PendingRequest(
-            __method, authority=parsed_url.netloc, path=parsed_url.path or "/",
-            path_args=final_path_args, scheme=parsed_url.scheme,
-            headers=headers, version=constants.HttpVersion.V1_1, body=body)
-
-        if content_type:
-            request.headers.setdefault("content-type", content_type)
-
-        return await self.send_request(
-            request,
-            read_response_body=read_response_body,
-            timeout=timeout,
-            follow_redirection=follow_redirection,
-            max_redirects=max_redirects,
-            max_body_size=max_body_size)
+            return await self.send_request(
+                request,
+                read_response_body=read_response_body,
+                timeout=timeout,
+                follow_redirection=follow_redirection,
+                max_redirects=max_redirects,
+                max_body_size=max_body_size)
 
     async def head(
             self, __url: str,
