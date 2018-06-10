@@ -123,8 +123,7 @@ class PendingRequest:
             f"uri={self.uri!r}",
             f"authority={self.authority!r}",
             f"scheme={self.scheme!r}",
-            f"headers={self.headers!r}",
-            f"body={self.body!r}"]
+            f"headers={self.headers!r}"]
 
         return f"<{self.__class__.__name__} {', '.join(parts)}>"
 
@@ -153,8 +152,8 @@ class Request:
         return self._writer.initial.authority  # type: ignore
 
     @property
-    def scheme(self) -> str:
-        return self._writer.initial.scheme  # type: ignore
+    def scheme(self) -> constants.HttpScheme:
+        return constants.HttpScheme(self._writer.initial.scheme.lower())
 
     @property
     def headers(self) -> magicdict.FrozenTolerantMagicDict[str, str]:
@@ -163,6 +162,31 @@ class Request:
     @property
     def writer(self) -> magichttp.HttpRequestWriter:
         return self._writer
+
+    def __repr__(self) -> str:
+        parts = [
+            f"method={self.method!r}",
+            f"version={self.version!r}",
+            f"uri={self.uri!r}"]
+
+        try:
+            parts.append(f"authority={self.authority!r}")
+
+        except AttributeError:
+            pass
+
+        try:
+            parts.append(f"scheme={self.scheme!r}")
+
+        except AttributeError:
+            pass
+
+        parts.append(f"headers={self.headers!r}")
+
+        return f"<{self.__class__.__name__} {', '.join(parts)}>"
+
+    def __str__(self) -> str:
+        return repr(self)
 
 
 class Response:
@@ -200,3 +224,15 @@ class Response:
     @property
     def body(self) -> bodies.ResponseBody:
         return self._body
+
+    def __repr__(self) -> str:
+        parts = [
+            f"request={self.request!r}",
+            f"status_code={self.status_code!r}",
+            f"version={self.version!r}",
+            f"headers={self.headers!r}"]
+
+        return f"<{self.__class__.__name__} {', '.join(parts)}>"
+
+    def __str__(self) -> str:
+        return repr(self)
