@@ -142,15 +142,20 @@ class HttpConnection:
             writer.finish()
             reader = await writer.read_response()
 
-            try:
-                res_body = await reader.read(max_body_size + 1)
+            if read_response_body:
+                try:
+                    res_body = await reader.read(max_body_size + 1)
 
-            except magichttp.ReadFinishedError:
+                except magichttp.ReadFinishedError:
+                    res_body = b""
+
+                if len(res_body) > max_body_size:
+                    raise exceptions.ResponseEntityTooLarge(
+                        "Response body is too large.")
+
+            else:
                 res_body = b""
-
-            if len(res_body) > max_body_size:
-                raise exceptions.ResponseEntityTooLarge(
-                    "Response body is too large.")
+                self.close()
 
         except (magichttp.ReadAbortedError,
                 magichttp.WriteAbortedError,
@@ -168,7 +173,7 @@ class HttpConnection:
         self._set_idle_timeout()
 
         return messages.Response(
-            messages.Request(writer), reader=reader, body=res_body)
+            messages.Request(writer), reader=reader, body=res_body, conn=self)
 
     def close(self) -> None:
         self._closing.set()

@@ -178,6 +178,12 @@ class HttpClient:
 
             await asyncio.wait(tasks)
 
+    async def __aenter__(self) -> "HttpClient":
+        return self
+
+    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
+        await self.close()
+
     async def send_request(
             self, __request: messages.PendingRequest, *,
             read_response_body: bool=True,

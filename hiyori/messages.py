@@ -25,6 +25,7 @@ from . import connection
 import urllib.parse
 import magicdict
 import magichttp
+import warnings
 
 __all__ = [
     "PendingRequest",
@@ -193,10 +194,12 @@ class Response:
     def __init__(
         self, request: Request,
         reader: magichttp.HttpResponseReader,
+        conn: "connection.HttpConnection",
             body: Optional[bytes]=None) -> None:
         self._request = request
 
         self._reader = reader
+        self._conn = conn
 
         self._body = bodies.ResponseBody(body) \
             if body else bodies.EMPTY_RESPONSE_BODY
@@ -236,3 +239,11 @@ class Response:
 
     def __str__(self) -> str:
         return repr(self)
+
+    def __del__(self) -> None:
+        if not self.reader.finished():
+            warnings.warn(
+                "Response body is not being properly retrieved. "
+                "Please read till the end.")
+
+            self.reader.abort()
