@@ -176,7 +176,8 @@ class HttpClient:
                 conn.close()
                 tasks.append(loop.create_task(conn.wait_closed()))
 
-            await asyncio.wait(tasks)
+            if tasks:
+                await asyncio.wait(tasks)
 
     async def __aenter__(self) -> "HttpClient":
         return self

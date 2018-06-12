@@ -102,8 +102,7 @@ class HttpConnection:
             host=self.conn_id.hostname,
             port=self.conn_id.port,
 
-            ssl=self._tls_context,
-            server_hostname=self.conn_id.hostname)
+            ssl=self._tls_context)
 
     async def send_request(
         self, __request: "messages.PendingRequest", *,

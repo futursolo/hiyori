@@ -35,7 +35,13 @@ install:
   - pip install -U pip setuptools
   - pip install .[test]
 
+  - pip install -U coveralls
+
 # commands to run tests
 script:
   - mypy --python-version 3.6 --strict --ignore-missing-imports --show-error-context --show-traceback -p hiyori
   - flake8 .
+  - coverage run --source=hiyori setup.py test
+
+after_success:
+  - coveralls
