@@ -7,24 +7,31 @@ matrix:
   include:
     - os: linux
       python: 3.6.1
+      env: PYVER=3.6
 
     - os: linux
       python: 3.6.2
+      env: PYVER=3.6
 
     - os: linux
       python: 3.6.3
+      env: PYVER=3.6
 
     - os: linux
       python: 3.6.4
+      env: PYVER=3.6
 
     - os: linux
       python: 3.6.5
+      env: PYVER=3.6
 
     - os: linux
       python: 3.6
+      env: PYVER=3.6
 
     - os: linux
       python: nightly
+      env: PYVER=3.7
 
 language: python
 
@@ -36,7 +43,7 @@ install:
 
 # commands to run tests
 script:
-  - mypy --python-version 3.6 --strict --ignore-missing-imports --show-error-context --show-traceback -p hiyori
+  - mypy --python-version $PYVER --strict --ignore-missing-imports --show-error-context --show-traceback -p hiyori
   - flake8 .
   - coverage run --source=hiyori setup.py test
 
