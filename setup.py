@@ -19,8 +19,8 @@ from setuptools import setup, find_packages
 
 import sys
 
-if not sys.version_info[:3] >= (3, 6, 0):
-    raise RuntimeError("Hiyori requires Python 3.6.0 or higher.")
+if not sys.version_info[:3] >= (3, 6, 1):
+    raise RuntimeError("Hiyori requires Python 3.6.1 or higher.")
 else:
     try:
         import _modify_version
