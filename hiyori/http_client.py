@@ -279,8 +279,10 @@ class HttpClient:
             self, __method: constants.HttpRequestMethod, __url: str,
             path_args: Optional[Mapping[str, str]]=None,
             headers: Optional[Mapping[str, str]]=None,
+
             body: Optional[_BODY]=None,
             json: Optional[Any]=None,
+
             read_response_body: bool=True,
             timeout: Optional[int]=None,
             follow_redirection: bool=False,
@@ -289,14 +291,18 @@ class HttpClient:
             ) -> messages.Response:
         with self._lock.read_lock:
             if None not in (body, json):
-                raise ValueError("You cannot both body and json supplied.")
+                raise ValueError(
+                    "You cannot supply both body and json argument.")
 
             parsed_url = urllib.parse.urlsplit(__url, scheme="http")
-            final_path_args = magicdict.TolerantMagicDict(path_args or {})
+            final_path_args = magicdict.TolerantMagicDict()
 
             if parsed_url.query:
                 final_path_args.update(
                     urllib.parse.parse_qsl(parsed_url.query))
+
+            if path_args:
+                final_path_args.update(path_args)
 
             if isinstance(body, dict):
                 for v in body.values():
@@ -323,7 +329,7 @@ class HttpClient:
                 headers=headers, version=constants.HttpVersion.V1_1, body=body)
 
             if content_type:
-                request.headers.setdefault("content-type", content_type)
+                request.headers["content-type"] = content_type
 
             return await self.send_request(
                 request,

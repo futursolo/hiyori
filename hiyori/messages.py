@@ -117,7 +117,7 @@ class PendingRequest:
             authority=self.authority,
             scheme=self.scheme)
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         parts = [
             f"method={self.method!r}",
             f"version={self.version!r}",
@@ -128,7 +128,7 @@ class PendingRequest:
 
         return f"<{self.__class__.__name__} {', '.join(parts)}>"
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return repr(self)
 
 
@@ -164,7 +164,7 @@ class Request:
     def writer(self) -> magichttp.HttpRequestWriter:
         return self._writer
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         parts = [
             f"method={self.method!r}",
             f"version={self.version!r}",
@@ -186,7 +186,7 @@ class Request:
 
         return f"<{self.__class__.__name__} {', '.join(parts)}>"
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return repr(self)
 
 
@@ -228,7 +228,7 @@ class Response:
     def body(self) -> bodies.ResponseBody:
         return self._body
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         parts = [
             f"request={self.request!r}",
             f"status_code={self.status_code!r}",
@@ -237,7 +237,7 @@ class Response:
 
         return f"<{self.__class__.__name__} {', '.join(parts)}>"
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return repr(self)
 
     def __del__(self) -> None:

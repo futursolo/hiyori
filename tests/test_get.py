@@ -33,6 +33,17 @@ class GetEchoServer(MockServer):
         super().connection_lost(exc)
 
 
+class JsonResponseServer(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        transport.write(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{\"a\": \"b\"}")
+
+    def connection_lost(self, exc):
+        super().connection_lost(exc)
+
+
 class GetTestCase:
     @helper.run_async_test
     @helper.with_server(GetEchoServer)
@@ -46,6 +57,39 @@ class GetTestCase:
             helper.assert_initial_bytes(
                 b"".join(helper.mock_srv.data_chunks),
                 b"GET / HTTP/1.1",
+                b"User-Agent: %(self_ver_bytes)s",
+                b"Accept: */*",
+                b"Host: localhost:8000")
+
+    @helper.run_async_test
+    @helper.with_server(JsonResponseServer)
+    async def test_json(self):
+        async with HttpClient() as client:
+            response = await client.get("http://localhost:8000")
+
+            assert response.status_code == 200
+            assert response.body.to_json() == {"a": "b"}
+
+            helper.assert_initial_bytes(
+                b"".join(helper.mock_srv.data_chunks),
+                b"GET / HTTP/1.1",
+                b"User-Agent: %(self_ver_bytes)s",
+                b"Accept: */*",
+                b"Host: localhost:8000")
+
+    @helper.run_async_test
+    @helper.with_server(GetEchoServer)
+    async def test_path_args(self):
+        async with HttpClient() as client:
+            response = await client.get(
+                "http://localhost:8000/?a=b", path_args={"c": "d"})
+
+            assert response.status_code == 200
+            assert response.body == b"Hello, World!"
+
+            helper.assert_initial_bytes(
+                b"".join(helper.mock_srv.data_chunks),
+                b"GET /?a=b&c=d HTTP/1.1",
                 b"User-Agent: %(self_ver_bytes)s",
                 b"Accept: */*",
                 b"Host: localhost:8000")
