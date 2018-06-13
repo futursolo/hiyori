@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori import HttpClient
+from hiyori import HttpClient, HttpRequestMethod, HttpVersion
 
 from test_helper import TestHelper, MockServer
 
@@ -29,9 +29,6 @@ class GetEchoServer(MockServer):
         transport.write(
             b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
 
-    def connection_lost(self, exc):
-        super().connection_lost(exc)
-
 
 class JsonResponseServer(MockServer):
     def connection_made(self, transport):
@@ -39,9 +36,6 @@ class JsonResponseServer(MockServer):
 
         transport.write(
             b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{\"a\": \"b\"}")
-
-    def connection_lost(self, exc):
-        super().connection_lost(exc)
 
 
 class GetTestCase:
@@ -53,6 +47,20 @@ class GetTestCase:
 
             assert response.status_code == 200
             assert response.body == b"Hello, World!"
+            assert response.version == HttpVersion.V1_1
+            assert response.headers == {"content-length": "13"}
+
+            assert response.request.method == HttpRequestMethod.GET
+            assert response.request.version == HttpVersion.V1_1
+            assert response.request.uri == "/"
+            assert response.request.authority == "localhost:8000"
+            assert not hasattr(response.request, "scheme")
+            assert response.request.headers == \
+                {
+                    "user-agent": helper.get_version_str(),
+                    "accept": "*/*",
+                    "host": "localhost:8000"
+                }
 
             helper.assert_initial_bytes(
                 b"".join(helper.mock_srv.data_chunks),

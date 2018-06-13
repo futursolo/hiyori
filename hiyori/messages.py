@@ -160,10 +160,6 @@ class Request:
     def headers(self) -> magicdict.FrozenTolerantMagicDict[str, str]:
         return self._writer.initial.headers
 
-    @property
-    def writer(self) -> magichttp.HttpRequestWriter:
-        return self._writer
-
     def __repr__(self) -> str:  # pragma: no cover
         parts = [
             f"method={self.method!r}",
@@ -241,7 +237,7 @@ class Response:
         return repr(self)
 
     def __del__(self) -> None:
-        if not self.reader.finished():
+        if not self._reader.finished():
             warnings.warn(
                 "Response body is not being properly retrieved. "
                 "Please read till the end.")
