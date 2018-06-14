@@ -16,7 +16,7 @@
 #   limitations under the License.
 
 from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
-     TooManyRedirects, FailedRedirection
+     TooManyRedirects, FailedRedirection, HttpError
 
 from test_helper import TestHelper, MockServer
 
@@ -73,6 +73,15 @@ class RelativeRedirectServer(MockServer):
 
         transport.write(
             b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+
+
+class Http404Server(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        transport.write(
+            b"HTTP/1.1 404 Not Found\r\nContent-Length: 19\r\n\r\n"
+            b"HTTP 404: Not Found")
 
 
 class GetTestCase:
@@ -173,3 +182,22 @@ class GetTestCase:
             with pytest.raises(FailedRedirection):
                 await client.get(
                     "http://localhost:8000/", follow_redirection=True)
+
+    @helper.run_async_test
+    @helper.with_server(Http404Server)
+    async def test_response_404(self):
+        async with HttpClient() as client:
+            with pytest.raises(HttpError) as exc_info:
+                await client.get("http://localhost:8000/")
+
+            assert exc_info.value.status_code == 404
+            assert exc_info.value.status_description == "Not Found"
+
+    @helper.run_async_test
+    @helper.with_server(Http404Server)
+    async def test_response_404_no_raise(self):
+        async with HttpClient(raise_error=False) as client:
+            response = await client.get("http://localhost:8000/")
+
+            assert response.status_code == 404
+            assert response.body == b"HTTP 404: Not Found"
