@@ -15,9 +15,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori import HttpClient, HttpRequestMethod, HttpVersion
+from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
+     TooManyRedirects, FailedRedirection
 
 from test_helper import TestHelper, MockServer
+
+import pytest
 
 helper = TestHelper()
 
@@ -36,6 +39,40 @@ class JsonResponseServer(MockServer):
 
         transport.write(
             b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{\"a\": \"b\"}")
+
+
+class AlwaysRedirectServer(MockServer):
+    def data_received(self, data):
+        super().data_received(data)
+
+        self.transport.write(
+            b"HTTP/1.1 302 Found\r\nLocation: /\r\n"
+            b"Content-Length: 0\r\n\r\n")
+
+
+class Redirect10TimesServer(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        for _ in range(0, 10):
+            transport.write(
+                b"HTTP/1.1 302 Found\r\nLocation: /\r\n"
+                b"Content-Length: 0\r\n\r\n")
+
+        transport.write(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+
+
+class RelativeRedirectServer(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        transport.write(
+            b"HTTP/1.1 302 Found\r\nLocation: ../\r\n"
+            b"Content-Length: 0\r\n\r\n")
+
+        transport.write(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
 
 
 class GetTestCase:
@@ -101,3 +138,38 @@ class GetTestCase:
                 b"User-Agent: %(self_ver_bytes)s",
                 b"Accept: */*",
                 b"Host: localhost:8000")
+
+    @helper.run_async_test
+    @helper.with_server(AlwaysRedirectServer)
+    async def test_default_no_redirect(self):
+        async with HttpClient() as client:
+            response = await client.get("http://localhost:8000/")
+
+            assert response.status_code == 302
+            assert response.headers["location"] == "/"
+
+    @helper.run_async_test
+    @helper.with_server(Redirect10TimesServer)
+    async def test_redirect_successful(self):
+        async with HttpClient() as client:
+            response = await client.get(
+                "http://localhost:8000/", follow_redirection=True)
+
+            assert response.status_code == 200
+            assert response.body == b"Hello, World!"
+
+    @helper.run_async_test
+    @helper.with_server(AlwaysRedirectServer)
+    async def test_too_many_redirects(self):
+        async with HttpClient() as client:
+            with pytest.raises(TooManyRedirects):
+                await client.get(
+                    "http://localhost:8000/", follow_redirection=True)
+
+    @helper.run_async_test
+    @helper.with_server(RelativeRedirectServer)
+    async def test_prevent_relative_redirect(self):
+        async with HttpClient() as client:
+            with pytest.raises(FailedRedirection):
+                await client.get(
+                    "http://localhost:8000/", follow_redirection=True)

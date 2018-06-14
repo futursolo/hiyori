@@ -30,7 +30,8 @@ __all__ = [
     "ResponseEntityTooLarge",
     "HttpError",
     "FailedRedirection",
-    "TooManyRedirects"]
+    "TooManyRedirects",
+    "ConnectionClosed"]
 
 
 class BaseHiyoriException(Exception):

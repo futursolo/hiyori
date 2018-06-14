@@ -185,6 +185,78 @@ class HttpClient:
     async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
         await self.close()
 
+    async def _handle_redirection(
+            self, __request: messages.PendingRequest, *,
+            read_response_body: bool=True,
+            timeout: Optional[int]=None,
+            follow_redirection: bool=False,
+            max_redirects: Optional[int]=None,
+            max_body_size: Optional[int]=None) -> messages.Response:
+        if max_redirects is None:
+            _max_redirects = self._max_redirects
+
+        else:
+            _max_redirects = max_redirects
+
+        for i in range(0, _max_redirects + 1):
+            if i == 0:
+                response = await self.send_request(
+                    __request,
+                    read_response_body=read_response_body,
+                    timeout=timeout,
+                    follow_redirection=False,
+                    max_body_size=max_body_size)
+
+            else:
+                try:
+                    location = response.headers["location"]
+
+                except KeyError as e:
+                    raise exceptions.BadResponse(
+                        "Server asked for a redirection; "
+                        "however, did not specify the location."
+                    ) from e
+
+                if _ABSOLUTE_PATH_RE.match(location) is None:
+                    raise exceptions.FailedRedirection(
+                        "Redirection support for relative path "
+                        "is not implemented.")
+
+                if location.startswith("/"):
+                    location = __request.scheme.value.lower() + "://" \
+                        + __request.authority + location
+
+                if response.status_code < 304:
+                    method = constants.HttpRequestMethod.GET
+                    body: Optional[bodies.BaseRequestBody] = None
+                    headers: Optional[Mapping[str, str]] = None
+
+                else:
+                    method = __request.method
+                    body = __request.body
+                    try:
+                        await body.seek_front()
+
+                    except NotImplementedError as e:
+                        raise exceptions.FailedRedirection(
+                            "seek_front is not implemented for"
+                            " current body.") from e
+                    headers = __request.headers
+
+                response = await self.fetch(
+                    method,
+                    location,
+                    headers=headers,
+                    body=body,
+                    read_response_body=read_response_body,
+                    timeout=timeout)
+
+            if response.status_code not in (301, 302, 303, 307, 308):
+                return response
+
+        else:
+            raise exceptions.TooManyRedirects(response.request)
+
     async def send_request(
             self, __request: messages.PendingRequest, *,
             read_response_body: bool=True,
@@ -193,6 +265,14 @@ class HttpClient:
             max_redirects: Optional[int]=None,
             max_body_size: Optional[int]=None
             ) -> messages.Response:
+        if follow_redirection:
+            return await self._handle_redirection(
+                __request,
+                read_response_body=read_response_body,
+                timeout=timeout,
+                max_redirects=max_redirects,
+                max_body_size=max_body_size)
+
         with self._lock.read_lock:
             _timeout = timeout if timeout is not None else self._timeout
             _max_body_size = max_body_size or self._max_body_size
@@ -214,66 +294,7 @@ class HttpClient:
             if read_response_body:
                 await self._put_conn(conn)
 
-            if not follow_redirection or \
-                    response.status_code not in (301, 302, 303, 307, 308):
-                return response
-
-            if max_redirects is None:
-                _max_redirects = self._max_redirects
-
-            else:
-                _max_redirects = max_redirects
-
-            if _max_redirects == 0:
-                raise exceptions.TooManyRedirects(response.request)
-
-            _max_redirects -= 1
-
-            try:
-                location = response.headers["location"]
-
-            except KeyError as e:
-                raise exceptions.BadResponse(
-                    "Server asked for a redirection; "
-                    "however, did not specify the location."
-                ) from e
-
-            if _ABSOLUTE_PATH_RE.match(location) is None:
-                raise exceptions.FailedRedirection(
-                    "Redirection support for relative path "
-                    "is not implemented.")
-
-            if location.startswith("/"):
-                location = __request.scheme.value.lower() + "://" \
-                    + __request.authority + location
-
-            if response.status_code < 304:
-                return await self.fetch(
-                    constants.HttpRequestMethod.GET,
-                    location,
-                    follow_redirection=True,
-                    max_redirects=_max_redirects,
-                    timeout=_timeout)
-
-            else:
-                body = __request.body
-                try:
-                    await body.seek_front()
-
-                except NotImplementedError as e:
-                    raise exceptions.FailedRedirection(
-                        "seek_front is not implemented for"
-                        " current body.") from e
-
-                return await self.fetch(
-                    response.request.method,
-                    location,
-                    headers=response.request.headers,
-                    body=body,
-                    read_response_body=read_response_body,
-                    follow_redirection=True,
-                    max_redirects=_max_redirects,
-                    timeout=_timeout)
+            return response
 
     async def fetch(
             self, __method: constants.HttpRequestMethod, __url: str,
