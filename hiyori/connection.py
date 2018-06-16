@@ -155,7 +155,6 @@ class HttpConnection:
                             raise exceptions.ResponseEntityTooLarge(
                                 "Response body is too large.")
 
-
                 except magichttp.ReadFinishedError:
                     res_body = bytes(body_buf)
 
