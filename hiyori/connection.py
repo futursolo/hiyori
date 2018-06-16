@@ -142,15 +142,22 @@ class HttpConnection:
             reader = await writer.read_response()
 
             if read_response_body:
+                body_buf = bytearray()
+
                 try:
-                    res_body = await reader.read(max_body_size + 1)
+                    while True:
+                        body_buf += await reader.read(
+                            max_body_size + 1 - len(body_buf))
+
+                        if len(body_buf) > max_body_size:
+                            reader.abort()
+
+                            raise exceptions.ResponseEntityTooLarge(
+                                "Response body is too large.")
+
 
                 except magichttp.ReadFinishedError:
-                    res_body = b""
-
-                if len(res_body) > max_body_size:
-                    raise exceptions.ResponseEntityTooLarge(
-                        "Response body is too large.")
+                    res_body = bytes(body_buf)
 
             else:
                 res_body = b""
@@ -159,18 +166,12 @@ class HttpConnection:
         except (magichttp.ReadAbortedError,
                 magichttp.WriteAbortedError,
                 magichttp.WriteAfterFinishedError) as e:
-            self.close()
-
             raise exceptions.ConnectionClosed("Connection closed.") from e
 
         except magichttp.ReceivedDataMalformedError as e:
-            self.close()
-
             raise exceptions.BadResponse from e
 
         except magichttp.EntityTooLargeError as e:
-            self.close()
-
             raise exceptions.ResponseEntityTooLarge from e
 
         self._set_idle_timeout()

@@ -16,7 +16,7 @@
 #   limitations under the License.
 
 from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
-     TooManyRedirects, FailedRedirection, HttpError
+     TooManyRedirects, FailedRedirection, HttpError, get
 
 from test_helper import TestHelper, MockServer
 
@@ -88,32 +88,31 @@ class GetTestCase:
     @helper.run_async_test
     @helper.with_server(GetEchoServer)
     async def test_simple(self):
-        async with HttpClient() as client:
-            response = await client.get("http://localhost:8000")
+        response = await get("http://localhost:8000")
 
-            assert response.status_code == 200
-            assert response.body == b"Hello, World!"
-            assert response.version == HttpVersion.V1_1
-            assert response.headers == {"content-length": "13"}
+        assert response.status_code == 200
+        assert response.body == b"Hello, World!"
+        assert response.version == HttpVersion.V1_1
+        assert response.headers == {"content-length": "13"}
 
-            assert response.request.method == HttpRequestMethod.GET
-            assert response.request.version == HttpVersion.V1_1
-            assert response.request.uri == "/"
-            assert response.request.authority == "localhost:8000"
-            assert not hasattr(response.request, "scheme")
-            assert response.request.headers == \
-                {
-                    "user-agent": helper.get_version_str(),
-                    "accept": "*/*",
-                    "host": "localhost:8000"
-                }
+        assert response.request.method == HttpRequestMethod.GET
+        assert response.request.version == HttpVersion.V1_1
+        assert response.request.uri == "/"
+        assert response.request.authority == "localhost:8000"
+        assert not hasattr(response.request, "scheme")
+        assert response.request.headers == \
+            {
+                "user-agent": helper.get_version_str(),
+                "accept": "*/*",
+                "host": "localhost:8000"
+            }
 
-            helper.assert_initial_bytes(
-                b"".join(helper.mock_srv.data_chunks),
-                b"GET / HTTP/1.1",
-                b"User-Agent: %(self_ver_bytes)s",
-                b"Accept: */*",
-                b"Host: localhost:8000")
+        helper.assert_initial_bytes(
+            b"".join(helper.mock_srv.data_chunks),
+            b"GET / HTTP/1.1",
+            b"User-Agent: %(self_ver_bytes)s",
+            b"Accept: */*",
+            b"Host: localhost:8000")
 
     @helper.run_async_test
     @helper.with_server(JsonResponseServer)

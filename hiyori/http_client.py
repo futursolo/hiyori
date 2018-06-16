@@ -35,6 +35,7 @@ import re
 __all__ = [
     "HttpClient",
 
+    "fetch",
     "get",
     "post",
     "put",
@@ -302,6 +303,12 @@ class HttpClient:
 
                 raise exceptions.RequestTimeout from e
 
+            except Exception:
+                conn.close()
+                await conn.wait_closed()
+
+                raise
+
             if read_response_body:
                 await self._put_conn(conn)
 
@@ -542,6 +549,7 @@ async def fetch(
         return await client.fetch(
             __method, __url,
             path_args=path_args, headers=headers,
+            body=body, json=json,
             read_response_body=read_response_body, timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,

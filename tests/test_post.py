@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori import HttpClient, HttpRequestMethod, HttpVersion
+from hiyori import HttpClient, HttpRequestMethod, HttpVersion, post
 
 from test_helper import TestHelper, MockServer
 
@@ -36,40 +36,39 @@ class PostTestCase:
     @helper.run_async_test
     @helper.with_server(PostEchoServer)
     async def test_simple(self):
-        async with HttpClient() as client:
-            response = await client.post(
-                "http://localhost:8000", body=b"1234567890")
+        response = await post(
+            "http://localhost:8000", body=b"1234567890")
 
-            assert response.status_code == 200
-            assert response.body == b"Hello, World!"
-            assert response.version == HttpVersion.V1_1
-            assert response.headers == {"content-length": "13"}
+        assert response.status_code == 200
+        assert response.body == b"Hello, World!"
+        assert response.version == HttpVersion.V1_1
+        assert response.headers == {"content-length": "13"}
 
-            assert response.request.method == HttpRequestMethod.POST
-            assert response.request.version == HttpVersion.V1_1
-            assert response.request.uri == "/"
-            assert response.request.authority == "localhost:8000"
-            assert not hasattr(response.request, "scheme")
-            assert response.request.headers == \
-                {
-                    "user-agent": helper.get_version_str(),
-                    "content-length": "10",
-                    "accept": "*/*",
-                    "host": "localhost:8000"
-                }
+        assert response.request.method == HttpRequestMethod.POST
+        assert response.request.version == HttpVersion.V1_1
+        assert response.request.uri == "/"
+        assert response.request.authority == "localhost:8000"
+        assert not hasattr(response.request, "scheme")
+        assert response.request.headers == \
+            {
+                "user-agent": helper.get_version_str(),
+                "content-length": "10",
+                "accept": "*/*",
+                "host": "localhost:8000"
+            }
 
-            initial_bytes, body = b"".join(helper.mock_srv.data_chunks).split(
-                b"\r\n\r\n", 1)
+        initial_bytes, body = b"".join(helper.mock_srv.data_chunks).split(
+            b"\r\n\r\n", 1)
 
-            helper.assert_initial_bytes(
-                initial_bytes,
-                b"POST / HTTP/1.1",
-                b"User-Agent: %(self_ver_bytes)s",
-                b"Content-Length: 10",
-                b"Accept: */*",
-                b"Host: localhost:8000")
+        helper.assert_initial_bytes(
+            initial_bytes,
+            b"POST / HTTP/1.1",
+            b"User-Agent: %(self_ver_bytes)s",
+            b"Content-Length: 10",
+            b"Accept: */*",
+            b"Host: localhost:8000")
 
-            assert body == b"1234567890"
+        assert body == b"1234567890"
 
     @helper.run_async_test
     @helper.with_server(PostEchoServer)
