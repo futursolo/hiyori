@@ -19,6 +19,8 @@ from hiyori import HttpClient, HttpRequestMethod, HttpVersion
 
 from test_helper import TestHelper, MockServer
 
+import pytest
+
 helper = TestHelper()
 
 
@@ -128,3 +130,11 @@ class PostTestCase:
                 b"Host: localhost:8000")
 
             assert body == b'{"a": "b", "c": [1, 2]}'
+
+    @helper.run_async_test
+    @helper.with_server(PostEchoServer)
+    async def test_urlencoded_and_json_body(self):
+        async with HttpClient() as client:
+            with pytest.raises(ValueError):
+                await client.post(
+                    "http://localhost:8000", body={"a": "b"}, json={"c": "d"})

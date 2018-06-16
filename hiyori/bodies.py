@@ -30,7 +30,7 @@ __all__ = [
     "ResponseBody"]
 
 
-class BaseRequestBody(abc.ABC):
+class BaseRequestBody(abc.ABC):  # pragma: no cover
     async def calc_len(self) -> int:
         """
         Implementation of this method is optional; however,
