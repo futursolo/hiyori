@@ -48,14 +48,12 @@ class _FileField(bodies.BaseRequestBody):
         self._headers = headers
 
         self._first_prefix = prefix
-        self._raw_prefix: Optional[bytes] = None
+        self._raw_prefix: Optional[bodies.BytesRequestBody] = None
 
         self._lock = asyncio.Lock()
 
-        self._ptr = 0
-
     @property
-    def _prefix(self) -> bytes:
+    def _prefix(self) -> bodies.BytesRequestBody:
         if self._raw_prefix is None:
             buf = bytearray(self._first_prefix)
 
@@ -64,7 +62,7 @@ class _FileField(bodies.BaseRequestBody):
 
             buf += b"\r\n"
 
-            self._raw_prefix = bytes(buf)
+            self._raw_prefix = bodies.BytesRequestBody(bytes(buf))
 
         return self._raw_prefix
 
@@ -72,17 +70,25 @@ class _FileField(bodies.BaseRequestBody):
         async with self._lock:
             self._fp.seek(0, io.SEEK_END)
 
-            return len(self._prefix) + self._fp.tell()
+            fp_len = self._fp.tell()
+
+            self._fp.seek(0, io.SEEK_SET)
+
+            return (await self._prefix.calc_len()) + fp_len
 
     async def seek_front(self) -> None:
-        self._ptr = 0
+        async with self._lock:
+            await self._prefix.seek_front()
+
+            self._fp.seek(0, io.SEEK_SET)
 
     async def read(self, n: int) -> bytes:
         async with self._lock:
-            if self._ptr < len(self._prefix):
-                part = self._prefix[self._ptr:self._ptr+n]
-                self._ptr += n
-                return part
+            try:
+                return await self._prefix.read(n)
+
+            except EOFError:
+                pass
 
             part = self._fp.read(n)
 
@@ -146,20 +152,22 @@ class MultipartRequestBody(bodies.BaseRequestBody):
         self._boundary = "--------HiyoriFormBoundary" + str(uuid.uuid4())
 
         field_prefix = b"--" + self._boundary.encode("ascii") + b"\r\n"
-        self._affix = b"--" + self._boundary.encode("ascii") + b"--\r\n"
 
-        self._fields: List[bodies.BaseRequestBody] = []
+        self._parts: List[bodies.BaseRequestBody] = []
 
         for name, value in form_dict.items():
             if isinstance(value, str):
-                self._fields.append(_StrField(name, value, field_prefix))
+                self._parts.append(_StrField(name, value, field_prefix))
 
             elif isinstance(value, File):
-                self._fields.append(value._to_file_field(name, field_prefix))
+                self._parts.append(value._to_file_field(name, field_prefix))
 
             else:
-                self._fields.append(
+                self._parts.append(
                     File(value)._to_file_field(name, field_prefix))
+
+        self._parts.append(bodies.BytesRequestBody(
+            b"--" + self._boundary.encode("ascii") + b"--\r\n"))
 
         self._body_len: Optional[int] = None
         self._ptr = 0
@@ -177,12 +185,12 @@ class MultipartRequestBody(bodies.BaseRequestBody):
     async def calc_len(self) -> int:
         async with self._lock:
             if self._body_len is None:
-                field_len = 0
+                body_len = 0
 
-                for field in self._fields:
-                    field_len += await field.calc_len()
+                for part in self._parts:
+                    body_len += await part.calc_len()
 
-                self._body_len = field_len + len(self._affix)
+                self._body_len = body_len
 
             return self._body_len
 
@@ -190,33 +198,18 @@ class MultipartRequestBody(bodies.BaseRequestBody):
         async with self._lock:
             self._ptr = 0
 
-            for field in self._fields:
-                await field.seek_front()
+            for part in self._parts:
+                await part.seek_front()
 
     async def read(self, n: int) -> bytes:
         async with self._lock:
-            if self._ptr >= 0:
-                while True:
-                    try:
-                        field = self._fields[self._ptr]
+            while len(self._parts) < self._ptr:
+                part = self._parts[self._ptr]
 
-                    except IndexError:
-                        self._ptr = -1
+                try:
+                    return await part.read(n)
 
-                        break
+                except EOFError:
+                    self._ptr += 1
 
-                    try:
-                        return await field.read(n)
-
-                    except EOFError:
-                        self._ptr += 1
-
-            affix_pos = -self._ptr - 1
-
-            if affix_pos >= len(self._affix):
-                raise EOFError
-
-            affix_part = self._affix[affix_pos:affix_pos + n]
-            self._ptr -= len(affix_part)
-
-            return affix_part
+            raise EOFError

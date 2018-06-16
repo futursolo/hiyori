@@ -159,9 +159,13 @@ class HttpConnection:
         except (magichttp.ReadAbortedError,
                 magichttp.WriteAbortedError,
                 magichttp.WriteAfterFinishedError) as e:
+            self.close()
+
             raise exceptions.ConnectionClosed("Connection closed.") from e
 
         except magichttp.ReceivedDataMalformedError as e:
+            self.close()
+
             raise exceptions.BadResponse from e
 
         except magichttp.EntityTooLargeError as e:
