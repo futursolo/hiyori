@@ -16,13 +16,11 @@
 #   limitations under the License.
 
 from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
-     TooManyRedirects, FailedRedirection, HttpError, get
+     TooManyRedirects, FailedRedirection, HttpError, ConnectionClosed, get
 
-from test_helper import TestHelper, MockServer
+from test_helper import helper, MockServer
 
 import pytest
-
-helper = TestHelper()
 
 
 class GetEchoServer(MockServer):
@@ -84,9 +82,17 @@ class Http404Server(MockServer):
             b"HTTP 404: Not Found")
 
 
+class ConnectionClosedServer(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        transport.write(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello,")
+        transport.close()
+
+
 class GetTestCase:
-    @helper.run_async_test
-    @helper.with_server(GetEchoServer)
+    @helper.run_async_test(with_srv_cls=GetEchoServer)
     async def test_simple(self):
         response = await get("http://localhost:8000")
 
@@ -114,8 +120,7 @@ class GetTestCase:
             b"Accept: */*",
             b"Host: localhost:8000")
 
-    @helper.run_async_test
-    @helper.with_server(JsonResponseServer)
+    @helper.run_async_test(with_srv_cls=JsonResponseServer)
     async def test_json(self):
         async with HttpClient() as client:
             response = await client.get("http://localhost:8000")
@@ -130,8 +135,7 @@ class GetTestCase:
                 b"Accept: */*",
                 b"Host: localhost:8000")
 
-    @helper.run_async_test
-    @helper.with_server(GetEchoServer)
+    @helper.run_async_test(with_srv_cls=GetEchoServer)
     async def test_path_args(self):
         async with HttpClient() as client:
             response = await client.get(
@@ -147,8 +151,7 @@ class GetTestCase:
                 b"Accept: */*",
                 b"Host: localhost:8000")
 
-    @helper.run_async_test
-    @helper.with_server(AlwaysRedirectServer)
+    @helper.run_async_test(with_srv_cls=AlwaysRedirectServer)
     async def test_default_no_redirect(self):
         async with HttpClient() as client:
             response = await client.get("http://localhost:8000/")
@@ -156,8 +159,7 @@ class GetTestCase:
             assert response.status_code == 302
             assert response.headers["location"] == "/"
 
-    @helper.run_async_test
-    @helper.with_server(Redirect10TimesServer)
+    @helper.run_async_test(with_srv_cls=Redirect10TimesServer)
     async def test_redirect_successful(self):
         async with HttpClient() as client:
             response = await client.get(
@@ -166,24 +168,21 @@ class GetTestCase:
             assert response.status_code == 200
             assert response.body == b"Hello, World!"
 
-    @helper.run_async_test
-    @helper.with_server(AlwaysRedirectServer)
+    @helper.run_async_test(with_srv_cls=AlwaysRedirectServer)
     async def test_too_many_redirects(self):
         async with HttpClient() as client:
             with pytest.raises(TooManyRedirects):
                 await client.get(
                     "http://localhost:8000/", follow_redirection=True)
 
-    @helper.run_async_test
-    @helper.with_server(RelativeRedirectServer)
+    @helper.run_async_test(with_srv_cls=RelativeRedirectServer)
     async def test_prevent_relative_redirect(self):
         async with HttpClient() as client:
             with pytest.raises(FailedRedirection):
                 await client.get(
                     "http://localhost:8000/", follow_redirection=True)
 
-    @helper.run_async_test
-    @helper.with_server(Http404Server)
+    @helper.run_async_test(with_srv_cls=Http404Server)
     async def test_response_404(self):
         async with HttpClient() as client:
             with pytest.raises(HttpError) as exc_info:
@@ -192,11 +191,16 @@ class GetTestCase:
             assert exc_info.value.status_code == 404
             assert exc_info.value.status_description == "Not Found"
 
-    @helper.run_async_test
-    @helper.with_server(Http404Server)
+    @helper.run_async_test(with_srv_cls=Http404Server)
     async def test_response_404_no_raise(self):
         async with HttpClient(raise_error=False) as client:
             response = await client.get("http://localhost:8000/")
 
             assert response.status_code == 404
             assert response.body == b"HTTP 404: Not Found"
+
+    @helper.run_async_test(with_srv_cls=ConnectionClosedServer)
+    async def test_connection_closed(self):
+        async with HttpClient() as client:
+            with pytest.raises(ConnectionClosed):
+                await client.get("http://localhost:8000/")

@@ -17,11 +17,9 @@
 
 from hiyori import HttpClient, HttpRequestMethod, HttpVersion, post
 
-from test_helper import TestHelper, MockServer
+from test_helper import helper, MockServer
 
 import pytest
-
-helper = TestHelper()
 
 
 class PostEchoServer(MockServer):
@@ -33,11 +31,9 @@ class PostEchoServer(MockServer):
 
 
 class PostTestCase:
-    @helper.run_async_test
-    @helper.with_server(PostEchoServer)
+    @helper.run_async_test(with_srv_cls=PostEchoServer)
     async def test_simple(self):
-        response = await post(
-            "http://localhost:8000", body=b"1234567890")
+        response = await post("http://localhost:8000", body=b"1234567890")
 
         assert response.status_code == 200
         assert response.body == b"Hello, World!"
@@ -57,6 +53,21 @@ class PostTestCase:
                 "host": "localhost:8000"
             }
 
+    @helper.run_async_test(with_srv_cls=PostEchoServer)
+    async def test_urlencoded_body(self):
+        async with HttpClient() as client:
+            response = await client.post(
+                "http://localhost:8000", body={"a": "b", "c": "d"})
+
+        assert response.request.headers == \
+            {
+                "user-agent": helper.get_version_str(),
+                "content-type": "application/x-www-form-urlencoded",
+                "content-length": "7",
+                "accept": "*/*",
+                "host": "localhost:8000"
+            }
+
         initial_bytes, body = b"".join(helper.mock_srv.data_chunks).split(
             b"\r\n\r\n", 1)
 
@@ -64,44 +75,14 @@ class PostTestCase:
             initial_bytes,
             b"POST / HTTP/1.1",
             b"User-Agent: %(self_ver_bytes)s",
-            b"Content-Length: 10",
+            b"Content-Type: application/x-www-form-urlencoded",
+            b"Content-Length: 7",
             b"Accept: */*",
             b"Host: localhost:8000")
 
-        assert body == b"1234567890"
+        assert body == b"a=b&c=d"
 
-    @helper.run_async_test
-    @helper.with_server(PostEchoServer)
-    async def test_urlencoded_body(self):
-        async with HttpClient() as client:
-            response = await client.post(
-                "http://localhost:8000", body={"a": "b", "c": "d"})
-
-            assert response.request.headers == \
-                {
-                    "user-agent": helper.get_version_str(),
-                    "content-type": "application/x-www-form-urlencoded",
-                    "content-length": "7",
-                    "accept": "*/*",
-                    "host": "localhost:8000"
-                }
-
-            initial_bytes, body = b"".join(helper.mock_srv.data_chunks).split(
-                b"\r\n\r\n", 1)
-
-            helper.assert_initial_bytes(
-                initial_bytes,
-                b"POST / HTTP/1.1",
-                b"User-Agent: %(self_ver_bytes)s",
-                b"Content-Type: application/x-www-form-urlencoded",
-                b"Content-Length: 7",
-                b"Accept: */*",
-                b"Host: localhost:8000")
-
-            assert body == b"a=b&c=d"
-
-    @helper.run_async_test
-    @helper.with_server(PostEchoServer)
+    @helper.run_async_test(with_srv_cls=PostEchoServer)
     async def test_json_body(self):
         async with HttpClient() as client:
             response = await client.post(
@@ -130,8 +111,7 @@ class PostTestCase:
 
             assert body == b'{"a": "b", "c": [1, 2]}'
 
-    @helper.run_async_test
-    @helper.with_server(PostEchoServer)
+    @helper.run_async_test(with_srv_cls=PostEchoServer)
     async def test_urlencoded_and_json_body(self):
         async with HttpClient() as client:
             with pytest.raises(ValueError):

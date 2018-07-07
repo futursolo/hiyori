@@ -20,6 +20,38 @@ import hiyori
 import magichttp
 
 
+class _SkeletonServer(asyncio.Protocol):
+    def connection_made(self, transport):
+        print("Connection made.")
+
+        if helper.mock_srv_cls is None:
+            transport.close()
+
+            return
+
+        self._mock_srv = helper.mock_srv_cls()
+        helper.mock_srv = self._mock_srv
+
+        self._mock_srv.connection_made(transport)
+
+    def data_received(self, data):
+        print(f"Data received: {data!r}.")
+
+        self._mock_srv.data_received(data)
+
+    def eof_received(self):
+        print(f"Eof received.")
+
+        return self._mock_srv.eof_received()
+
+    def connection_lost(self, exc):
+        print("Connection lost.")
+        if exc:
+            print(exc)
+
+        self._mock_srv.connection_lost(exc)
+
+
 class MockServer(asyncio.Protocol):
     def __init__(self):
         self.transport = None
@@ -43,7 +75,7 @@ class MockServer(asyncio.Protocol):
         self.conn_lost = True
 
 
-class TestHelper:
+class _TestHelper:
     def __init__(self):
         self.loop = asyncio.get_event_loop()
 
@@ -52,42 +84,66 @@ class TestHelper:
         self._tsks = set()
 
         self.mock_srv = None
+        self.mock_srv_cls = None
 
-    def run_async_test(self, coro_fn):
-        async def test_coro(_self, *args, **kwargs):
-            exc = None
+        self._srv = self.loop.run_until_complete(self.loop.create_server(
+            _SkeletonServer, host="localhost", port=8000))
 
-            try:
-                await asyncio.wait_for(
-                    coro_fn(_self, *args, **kwargs), timeout=5)
+    def run_async_test(self, *args, with_srv_cls=None):
+        def decorator(coro_fn):
+            async def test_coro(_self, *args, **kwargs):
+                self.mock_srv_cls = with_srv_cls
 
-            except Exception as e:
-                exc = e
-
-            self._tsks, tsks = set(), self._tsks
-
-            for tsk in tsks:
+                exc = None
 
                 try:
-                    if not tsk.done():
-                        tsk.cancel()
-
-                    await tsk
-
-                except asyncio.CancelledError:
-                    continue
+                    await asyncio.wait_for(
+                        coro_fn(_self, *args, **kwargs), timeout=5)
 
                 except Exception as e:
-                    if not exc:
-                        exc = e
+                    exc = e
 
-            if exc:
-                raise RuntimeError from exc
+                if self.mock_srv:
+                    self.mock_srv.transport.close()
+                    self.mock_srv = None
 
-        def wrapper(_self, *args, **kwargs):
-            self.loop.run_until_complete(test_coro(_self, *args, **kwargs))
+                self._tsks, tsks = set(), self._tsks
 
-        return wrapper
+                for tsk in tsks:
+                    try:
+                        if not tsk.done():
+                            tsk.cancel()
+
+                        await tsk
+
+                    except asyncio.CancelledError:
+                        continue
+
+                    except BaseException as e:
+                        if not exc:
+                            exc = e
+
+                if exc:
+                    raise exc
+
+            def wrapper(_self, *args, **kwargs):
+                self.loop.run_until_complete(test_coro(_self, *args, **kwargs))
+
+            return wrapper
+
+        if args:
+            if len(args) > 1:
+                raise RuntimeError("Only one positional argument is allowed.")
+
+            if with_srv_cls is not None:
+                raise RuntimeError("This is not okay.")
+
+            return decorator(args[0])
+
+        if with_srv_cls is None:
+            raise RuntimeError("You must provide a server class.")
+
+        return decorator
 
     def create_task(self, coro):
         tsk = self.loop.create_task(coro)
@@ -95,38 +151,6 @@ class TestHelper:
         self._tsks.add(tsk)
 
         return tsk
-
-    def with_server(self, srv_cls):
-        class _Server(srv_cls):
-            def connection_made(_self, transport):
-                super().connection_made(transport)
-                self.mock_srv = _self
-
-            def connection_lost(_self, exc):
-                super().connection_lost(exc)
-
-        def decorator(fn):
-            async def wrapper(_self, *args, **kwargs):
-                srv = await self.loop.create_server(
-                    _Server, host="localhost", port=8000)
-
-                try:
-                    result = await fn(_self, *args, **kwargs)
-
-                except Exception:
-                    raise
-
-                finally:
-                    srv.close()
-                    await srv.wait_closed()
-
-                    self.mock_srv = None
-
-                return result
-
-            return wrapper
-
-        return decorator
 
     def get_version_str(self):
         return f"hiyori/{hiyori.__version__} magichttp/{magichttp.__version__}"
@@ -146,3 +170,10 @@ class TestHelper:
         for line in header_lines:
             line = line % {b"self_ver_bytes": self.get_version_bytes()}
             assert line in buf_parts
+
+    def __del__(self):
+        self._srv.close()
+        self.loop.run_until_complete(self._srv.wait_closed())
+
+
+helper = _TestHelper()
