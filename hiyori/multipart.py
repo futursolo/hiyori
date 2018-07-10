@@ -114,7 +114,6 @@ class File:
         self._content_type = content_type
 
         self._headers = magicdict.TolerantMagicDict(headers or {})
-        self._headers.setdefault("content-type", self._content_type)
 
     def _to_file_field(self, name: str, prefix: bytes) -> _FileField:
         if "content-type" not in self._headers.keys():
@@ -203,7 +202,7 @@ class MultipartRequestBody(bodies.BaseRequestBody):
 
     async def read(self, n: int) -> bytes:
         async with self._lock:
-            while len(self._parts) < self._ptr:
+            while self._ptr < len(self._parts):
                 part = self._parts[self._ptr]
 
                 try:
