@@ -16,11 +16,13 @@
 #   limitations under the License.
 
 from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
-     TooManyRedirects, FailedRedirection, HttpError, ConnectionClosed, get
+     TooManyRedirects, FailedRedirection, HttpError, ConnectionClosed, get, \
+     ResponseEntityTooLarge, BadResponse
 
 from test_helper import helper, MockServer
 
 import pytest
+import os
 
 
 class GetEchoServer(MockServer):
@@ -89,6 +91,21 @@ class ConnectionClosedServer(MockServer):
         transport.write(
             b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello,")
         transport.close()
+
+
+class UrandomServer(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        transport.write(os.urandom(128 * 1024))
+
+
+class MalformedServer(MockServer):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        transport.write(
+            b"HTTP/1.2 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
 
 
 class GetTestCase:
@@ -204,3 +221,21 @@ class GetTestCase:
         async with HttpClient() as client:
             with pytest.raises(ConnectionClosed):
                 await client.get("http://localhost:8000/")
+
+    @helper.run_async_test(with_srv_cls=GetEchoServer)
+    async def test_too_large(self):
+        async with HttpClient(max_body_size=12) as client:
+            with pytest.raises(ResponseEntityTooLarge):
+                await client.get("http://localhost:8000")
+
+    @helper.run_async_test(with_srv_cls=UrandomServer)
+    async def test_too_large_2(self):
+        async with HttpClient(max_body_size=12) as client:
+            with pytest.raises(ResponseEntityTooLarge):
+                await client.get("http://localhost:8000")
+
+    @helper.run_async_test(with_srv_cls=MalformedServer)
+    async def test_malformed_data(self):
+        async with HttpClient(max_body_size=12) as client:
+            with pytest.raises(BadResponse):
+                await client.get("http://localhost:8000")
