@@ -53,6 +53,7 @@ _BODY = Union[bytes, bodies.BaseRequestBody,
 class _ReadLock:
     def __init__(self, client_lock: "_ClientLock") -> None:
         self._idling = asyncio.Event()
+        self._idling.set()
         self._count = 0
 
         self._client_lock = client_lock
