@@ -6,6 +6,9 @@ hiyori
 .. image:: https://coveralls.io/repos/github/futursolo/hiyori/badge.svg?branch=master
    :target: https://coveralls.io/github/futursolo/hiyori?branch=master
 
+.. image:: https://img.shields.io/pypi/v/hiyori.svg
+   :target: https://pypi.org/project/hiyori/
+
 Hiyori is an http client for asyncio.
 
 Install
