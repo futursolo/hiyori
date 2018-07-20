@@ -10,7 +10,7 @@ Hiyori is an http client for asyncio.
 
 Install
 -------
-.. code-block:: python3
+.. code-block:: shell
 
     $ pip install -U hiyori
 
