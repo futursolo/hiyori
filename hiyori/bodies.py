@@ -125,7 +125,7 @@ class ResponseBody(bytes):
             Dict[str, Any], List[Any], int, str, float, bool, None]:
         return json.loads(self.to_str())  # type: ignore
 
-    def to_str(self, encoding: str="utf-8") -> str:
+    def to_str(self, encoding: str = "utf-8") -> str:
         return self.decode(encoding)
 
 

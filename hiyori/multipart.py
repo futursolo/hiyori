@@ -101,9 +101,9 @@ class _FileField(bodies.BaseRequestBody):
 class File:
     def __init__(
         self, __fp: Union[BinaryIO, bytes],
-        filename: Optional[str]=None,
-        content_type: Optional[str]=None,
-            headers: Optional[Mapping[str, str]]=None) -> None:
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+            headers: Optional[Mapping[str, str]] = None) -> None:
         if isinstance(__fp, bytes):
             self._fp: BinaryIO = io.BytesIO(__fp)
 

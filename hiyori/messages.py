@@ -38,13 +38,14 @@ _SELF_IDENTIFIER = "hiyori/{} magichttp/{}".format(
 
 class PendingRequest:
     def __init__(
-            self, __method: constants.HttpRequestMethod, *,
-            authority: str, path: str="/",
-            path_args: Optional[Mapping[str, str]]=None,
-            scheme: Union[str, constants.HttpScheme]=constants.HttpScheme.HTTP,
-            headers: Optional[Mapping[str, str]]=None,
-            version: constants.HttpVersion=constants.HttpVersion.V1_1,
-            body: Optional[Union[bytes, bodies.BaseRequestBody]]=None) -> None:
+        self, __method: constants.HttpRequestMethod, *,
+        authority: str, path: str = "/",
+        path_args: Optional[Mapping[str, str]] = None,
+        scheme: Union[str, constants.HttpScheme] = constants.HttpScheme.HTTP,
+        headers: Optional[Mapping[str, str]] = None,
+        version: constants.HttpVersion = constants.HttpVersion.V1_1,
+        body: Optional[Union[bytes, bodies.BaseRequestBody]] = None
+            ) -> None:
         assert path.find("?") == -1, \
             "Please pass path arguments using path_args keyword argument."
 
@@ -191,7 +192,7 @@ class Response:
         self, request: Request,
         reader: magichttp.HttpResponseReader,
         conn: "connection.HttpConnection",
-            body: Optional[bytes]=None) -> None:
+            body: Optional[bytes] = None) -> None:
         self._request = request
 
         self._reader = reader
