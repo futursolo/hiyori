@@ -58,14 +58,14 @@ class _ReadLock:
 
         self._client_lock = client_lock
 
-    def __enter__(self) -> None:
+    async def __aenter__(self) -> None:
         if self._client_lock.close_lock._closing:
             raise RuntimeError("Client is closing.")
 
         self._count += 1
         self._idling.clear()
 
-    def __exit__(self, *args: Any, **kwargs: Any) -> None:
+    async def __aexit__(self, *args: Any, **kwargs: Any) -> None:
         self._count -= 1
 
         if self._count == 0:
@@ -94,6 +94,12 @@ class _ClientLock:
 
 
 class HttpClient:
+    """
+    Hiyori HTTP Client.
+
+    This class holds persistent connections and tls sessions. You may want to
+    use this class if you want to make multiple requests.
+    """
     def __init__(
             self, *,
             idle_timeout: int=10,
@@ -283,7 +289,7 @@ class HttpClient:
                 max_body_size=max_body_size,
                 raise_error=raise_error)
 
-        with self._lock.read_lock:
+        async with self._lock.read_lock:
             _timeout = timeout if timeout is not None else self._timeout
             _max_body_size = max_body_size if max_body_size is not None else \
                 self._max_body_size
@@ -334,7 +340,7 @@ class HttpClient:
 
             raise_error: Optional[bool]=None
             ) -> messages.Response:
-        with self._lock.read_lock:
+        async with self._lock.read_lock:
             if None not in (body, json):
                 raise ValueError(
                     "You cannot supply both body and json argument.")

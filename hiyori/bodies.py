@@ -31,6 +31,11 @@ __all__ = [
 
 
 class BaseRequestBody(abc.ABC):  # pragma: no cover
+    """
+    Base class for request bodies.
+
+    Subclass this class is you want to create custom request body.
+    """
     async def calc_len(self) -> int:
         """
         Implementation of this method is optional; however,
@@ -56,6 +61,9 @@ class BaseRequestBody(abc.ABC):  # pragma: no cover
 
 
 class BytesRequestBody(BaseRequestBody):
+    """
+    Request body to send :class:`bytes`.
+    """
     def __init__(self, buf: bytes) -> None:
         self._len = len(buf)
 
@@ -78,16 +86,27 @@ class BytesRequestBody(BaseRequestBody):
 
 
 class UrlEncodedRequestBody(BytesRequestBody):
+    """
+    Use this class to convert a :code:`Mapping[str, str]` to a request body
+    using :func:`urllib.parse.urlencode`.
+    """
     def __init__(self, __map: Mapping[str, str]) -> None:
         super().__init__(urllib.parse.urlencode(__map).encode())
 
 
 class JsonRequestBody(BytesRequestBody):
+    """
+    Use this class to convert a :code:`Mapping[str, str]` to a request body
+    using :func:`json.loads`.
+    """
     def __init__(self, json_obj: Any) -> None:
         super().__init__(json.dumps(json_obj).encode("utf-8"))
 
 
 class _EmptyRequestBody(BaseRequestBody):
+    """
+    Dummy body used when no body should be sent.
+    """
     async def calc_len(self) -> int:
         return 0
 

@@ -50,6 +50,9 @@ class HttpConnectionId(NamedTuple):
 
 
 class HttpConnection:
+    """
+    Internal object that controls an http connection.
+    """
     def __init__(
         self, __conn_id: HttpConnectionId, *, max_initial_size: int,
             chunk_size: int, tls_context: Optional[ssl.SSLContext],
