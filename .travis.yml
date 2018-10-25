@@ -1,4 +1,5 @@
-sudo: false
+sudo: required
+dist: xenial
 
 matrix:
   allow_failures:
@@ -35,15 +36,15 @@ matrix:
 
     - os: linux
       python: 3.6
-      env: PYVER=3.6 DEPLOY_PYPI=1
+      env: PYVER=3.6
 
-    # - os: linux
-    #   python: 3.7.0
-    #   env: PYVER=3.7
+    - os: linux
+      python: 3.7.0
+      env: PYVER=3.7
 
-    # - os: linux
-    #   python: 3.7
-    #   env: PYVER=3.7
+    - os: linux
+      python: 3.7
+      env: PYVER=3.7 DEPLOY_PYPI=1
 
     - os: linux
       python: nightly
