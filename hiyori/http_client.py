@@ -59,6 +59,8 @@ class _ReadLock:
         self._client_lock = client_lock
 
     async def __aenter__(self) -> None:
+        await asyncio.sleep(0)
+
         if self._client_lock.close_lock._closing:
             raise RuntimeError("Client is closing.")
 
