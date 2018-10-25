@@ -9,10 +9,12 @@ matrix:
     - os: linux
       python: 3.6.1
       env: PYVER=3.6
+      dist: trusty
 
     - os: linux
       python: 3.6.2
       env: PYVER=3.6
+      dist: trusty
 
     - os: linux
       python: 3.6.3
