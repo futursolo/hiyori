@@ -11,3 +11,4 @@ global-exclude *.pyc
 prune docs/_build
 prune tests/.cache
 include *requirements.txt
+recursive-include . py.typed
