@@ -33,11 +33,11 @@ else:
 
     import _load_version
 
-setup_requires = ["setuptools>=39", "pytest-runner>=4.2,<5"]
+setup_requires = ["setuptools>=50", "pytest-runner>=5.2,<6"]
 
-install_requires = ["magichttp>=1.0.0,<2", "magicdict>=1.0.2,<2"]
+install_requires = ["magichttp>=1.1.0,<2", "magicdict>=1.0.5,<2"]
 
-tests_require = ["pytest>=3.6.0,<4", "mypy>=0.600,<1", "flake8>=3.5.0,<4"]
+tests_require = ["pytest>=6.0.1,<7", "mypy>=0.782,<1", "flake8>=3.8.3,<4"]
 
 
 if __name__ == "__main__":

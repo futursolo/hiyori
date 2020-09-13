@@ -144,7 +144,7 @@ class HttpClient:
 
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
-    )-> connection.HttpConnection:
+    ) -> connection.HttpConnection:
         if __id in self._conns.keys():
             conn = self._conns.pop(__id)
 
@@ -349,7 +349,8 @@ class HttpClient:
                     "You cannot supply both body and json argument.")
 
             parsed_url = urllib.parse.urlsplit(__url, scheme="http")
-            final_path_args = magicdict.TolerantMagicDict()
+            final_path_args: magicdict.TolerantMagicDict[str, str] = \
+                magicdict.TolerantMagicDict()
 
             if parsed_url.query:
                 final_path_args.update(

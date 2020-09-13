@@ -40,7 +40,7 @@ class _SkeletonServer(asyncio.Protocol):
         self._mock_srv.data_received(data)
 
     def eof_received(self):
-        print(f"Eof received.")
+        print("Eof received.")
 
         return self._mock_srv.eof_received()
 

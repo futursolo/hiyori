@@ -113,7 +113,8 @@ class File:
         self._filename = filename
         self._content_type = content_type
 
-        self._headers = magicdict.TolerantMagicDict(headers or {})
+        self._headers: magicdict.TolerantMagicDict[str, str] = \
+            magicdict.TolerantMagicDict(headers or {})
 
     def _to_file_field(self, name: str, prefix: bytes) -> _FileField:
         if "content-type" not in self._headers.keys():

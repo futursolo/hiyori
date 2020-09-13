@@ -1,4 +1,3 @@
-sudo: required
 dist: xenial
 
 matrix:
@@ -7,50 +6,17 @@ matrix:
 
   include:
     - os: linux
-      python: 3.6.1
-      env: PYVER=3.6
-      dist: trusty
-
-    - os: linux
-      python: 3.6.2
-      env: PYVER=3.6
-      dist: trusty
-
-    - os: linux
-      python: 3.6.3
-      env: PYVER=3.6
-
-    - os: linux
-      python: 3.6.4
-      env: PYVER=3.6
-
-    - os: linux
-      python: 3.6.5
-      env: PYVER=3.6
-
-    - os: linux
-      python: 3.6.6
-      env: PYVER=3.6
-
-    - os: linux
-      python: 3.6.7
-      env: PYVER=3.6
-
-    - os: linux
       python: 3.6
-      env: PYVER=3.6
-
-    - os: linux
-      python: 3.7.0
-      env: PYVER=3.7
 
     - os: linux
       python: 3.7
-      env: PYVER=3.7 DEPLOY_PYPI=1
+
+    - os: linux
+      python: 3.8
+      env: DEPLOY_PYPI=1
 
     - os: linux
       python: nightly
-      env: PYVER=3.8
 
 language: python
 
@@ -62,7 +28,7 @@ install:
 
 # commands to run tests
 script:
-  - mypy --python-version $PYVER --strict --ignore-missing-imports --show-error-context --show-traceback -p hiyori
+  - mypy --python-version 3.8 --strict --show-traceback --ignore-missing-imports --show-error-context --implicit-reexport --pretty -p hiyori
   - flake8 .
   - coverage run --source=hiyori setup.py test
 

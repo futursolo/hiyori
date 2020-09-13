@@ -22,7 +22,6 @@ from . import exceptions
 from . import constants
 
 import asyncio
-import typing
 import magichttp
 import ssl
 
@@ -53,6 +52,7 @@ class HttpConnection:
     """
     Internal object that controls an http connection.
     """
+
     def __init__(
         self, __conn_id: HttpConnectionId, *, max_initial_size: int,
             chunk_size: int, tls_context: Optional[ssl.SSLContext],
@@ -81,7 +81,7 @@ class HttpConnection:
             self._idle_timer.cancel()
             self._idle_timer = None
 
-    async def get_ready(self)-> None:
+    async def get_ready(self) -> None:
         self._cancel_idle_timeout()
 
         if self.closing():
@@ -91,16 +91,15 @@ class HttpConnection:
                 not self._protocol.transport.is_closing():
             return
 
-        def create_conn() -> "asyncio.Protocol":
-            class _Protocol(magichttp.HttpClientProtocol):  # type: ignore
+        def create_conn() -> magichttp.HttpClientProtocol:
+            class _Protocol(magichttp.HttpClientProtocol):
                 MAX_INITIAL_SIZE = self._max_initial_size
 
-            return typing.cast(asyncio.Protocol, _Protocol(
-                http_version=self.conn_id.http_version))
+            return _Protocol(http_version=self.conn_id.http_version)
 
         loop = asyncio.get_event_loop()
 
-        _, self._protocol = await loop.create_connection(
+        _, self._protocol = await loop.create_connection(  # type: ignore
             create_conn,
             host=self.conn_id.hostname,
             port=self.conn_id.port,

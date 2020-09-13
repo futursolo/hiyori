@@ -45,7 +45,7 @@ class PendingRequest:
         headers: Optional[Mapping[str, str]] = None,
         version: constants.HttpVersion = constants.HttpVersion.V1_1,
         body: Optional[Union[bytes, bodies.BaseRequestBody]] = None
-            ) -> None:
+    ) -> None:
         assert path.find("?") == -1, \
             "Please pass path arguments using path_args keyword argument."
 
@@ -113,7 +113,7 @@ class PendingRequest:
 
     @property
     def conn_id(self) -> "connection.HttpConnectionId":
-        return connection.HttpConnectionId(  # type: ignore  # Any?
+        return connection.HttpConnectionId(
             http_version=self.version,
             authority=self.authority,
             scheme=self.scheme)
@@ -147,11 +147,11 @@ class Request:
 
     @property
     def uri(self) -> str:
-        return self._writer.initial.uri  # type: ignore
+        return self._writer.initial.uri
 
     @property
     def authority(self) -> str:
-        return self._writer.initial.authority  # type: ignore
+        return self._writer.initial.authority
 
     @property
     def scheme(self) -> constants.HttpScheme:

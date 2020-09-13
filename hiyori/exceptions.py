@@ -82,7 +82,7 @@ class HttpError(BaseHiyoriException):
 
     @property
     def status_description(self) -> str:
-        return self.response.status_code.phrase  # type: ignore
+        return self.response.status_code.phrase
 
 
 class FailedRedirection(BaseHiyoriException):
@@ -96,6 +96,7 @@ class TooManyRedirects(FailedRedirection):
     """
     Raise when the number of redirects exceeds :code:`max_redirect_num`.
     """
+
     def __init__(self, last_request: "messages.Request", *args: Any) -> None:
         self._last_request = last_request
 
