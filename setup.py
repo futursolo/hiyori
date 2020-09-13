@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2018 Kaede Hoshikawa
+#   Copyright 2020 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -21,21 +21,12 @@ import sys
 
 if not sys.version_info[:3] >= (3, 6, 1):
     raise RuntimeError("Hiyori requires Python 3.6.1 or higher.")
-else:
-    try:
-        import _modify_version
 
-    except ImportError:
-        pass
+setup_requires = ["setuptools>=50",
+                  "pytest-runner>=5.2,<6", "setuptools-scm>=4.1.2"]
 
-    else:
-        _modify_version.modify("hiyori")
-
-    import _load_version
-
-setup_requires = ["setuptools>=50", "pytest-runner>=5.2,<6"]
-
-install_requires = ["magichttp>=1.1.0,<2", "magicdict>=1.0.5,<2"]
+install_requires = ["magichttp>=1.1.1,<2", "magicdict>=1.0.6,<2",
+                    "importlib-metadata>=1.7.0;python_version<'3.8'"]
 
 tests_require = ["pytest>=6.0.1,<7", "mypy>=0.782,<1", "flake8>=3.8.3,<4"]
 
@@ -43,7 +34,7 @@ tests_require = ["pytest>=6.0.1,<7", "mypy>=0.782,<1", "flake8>=3.8.3,<4"]
 if __name__ == "__main__":
     setup(
         name="hiyori",
-        version=_load_version.load("hiyori"),
+        use_scm_version={"local_scheme": lambda v: ""},
         author="Kaede Hoshikawa",
         author_email="futursolo@icloud.com",
         url="https://github.com/futursolo/hiyori",
@@ -51,6 +42,7 @@ if __name__ == "__main__":
         description="Hiyori is an http client for asyncio.",
         long_description=open("README.rst", "r").read(),
         packages=find_packages(),
+        package_data={"": ["*"]},
         include_package_data=True,
         setup_requires=setup_requires,
         install_requires=install_requires,

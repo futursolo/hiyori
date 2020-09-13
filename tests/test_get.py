@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2018 Kaede Hoshikawa
+#   Copyright 2020 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 #   limitations under the License.
 
 from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
-     TooManyRedirects, FailedRedirection, HttpError, ConnectionClosed, get, \
-     ResponseEntityTooLarge, BadResponse
+    TooManyRedirects, FailedRedirection, HttpError, ConnectionClosed, get, \
+    ResponseEntityTooLarge, BadResponse
 
 from test_helper import helper, MockServer
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2018 Kaede Hoshikawa
+#   Copyright 2020 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -64,6 +64,7 @@ class BytesRequestBody(BaseRequestBody):
     """
     Request body to send :class:`bytes`.
     """
+
     def __init__(self, buf: bytes) -> None:
         self._len = len(buf)
 
@@ -90,6 +91,7 @@ class UrlEncodedRequestBody(BytesRequestBody):
     Use this class to convert a :code:`Mapping[str, str]` to a request body
     using :func:`urllib.parse.urlencode`.
     """
+
     def __init__(self, __map: Mapping[str, str]) -> None:
         super().__init__(urllib.parse.urlencode(__map).encode())
 
@@ -99,6 +101,7 @@ class JsonRequestBody(BytesRequestBody):
     Use this class to convert a :code:`Mapping[str, str]` to a request body
     using :func:`json.loads`.
     """
+
     def __init__(self, json_obj: Any) -> None:
         super().__init__(json.dumps(json_obj).encode("utf-8"))
 
