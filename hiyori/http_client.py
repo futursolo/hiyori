@@ -15,8 +15,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import MutableMapping, Optional, Mapping, Union, Dict, Any, \
-    BinaryIO, List
+from typing import (
+    MutableMapping,
+    Optional,
+    Mapping,
+    Union,
+    Dict,
+    Any,
+    BinaryIO,
+    List,
+)
 
 from . import messages
 from . import exceptions
@@ -24,6 +32,7 @@ from . import constants
 from . import connection
 from . import bodies
 from . import multipart
+from . import resolvers
 
 import ssl
 import collections
@@ -34,7 +43,6 @@ import re
 
 __all__ = [
     "HttpClient",
-
     "fetch",
     "get",
     "post",
@@ -42,12 +50,16 @@ __all__ = [
     "delete",
     "head",
     "options",
-    "patch"]
+    "patch",
+]
 
 _ABSOLUTE_PATH_RE = re.compile("^(http:/|https:/)?/")
 
-_BODY = Union[bytes, bodies.BaseRequestBody,
-              Dict[str, Union[str, BinaryIO, multipart.File]]]
+_BODY = Union[
+    bytes,
+    bodies.BaseRequestBody,
+    Dict[str, Union[str, BinaryIO, multipart.File]],
+]
 
 
 class _ReadLock:
@@ -104,20 +116,19 @@ class HttpClient:
     """
 
     def __init__(
-            self, *,
-            idle_timeout: int = 10,
-            timeout: int = 60,
-
-            max_initial_size: int = 64 * 1024,  # 64K
-            max_body_size: int = 2 * 1024 * 1024,  # 2M
-            chunk_size: int = 128 * 1024,  # 128K
-
-            allow_keep_alive: bool = True,
-            tls_context: Optional[ssl.SSLContext] = None,
-            max_idle_connections: int = 100,
-            max_redirects: int = 10,
-
-            raise_error: bool = True
+        self,
+        *,
+        idle_timeout: int = 10,
+        timeout: int = 60,
+        max_initial_size: int = 64 * 1024,  # 64K
+        max_body_size: int = 2 * 1024 * 1024,  # 2M
+        chunk_size: int = 128 * 1024,  # 128K
+        allow_keep_alive: bool = True,
+        tls_context: Optional[ssl.SSLContext] = None,
+        max_idle_connections: int = 100,
+        max_redirects: int = 10,
+        resolver: Optional[resolvers.BaseResolver] = None,
+        raise_error: bool = True,
     ) -> None:
         self._allow_keep_alive = allow_keep_alive
         self._max_initial_size = max_initial_size
@@ -125,8 +136,9 @@ class HttpClient:
         self._max_body_size = max_body_size
         self._chunk_size = chunk_size
 
-        self._tls_context = tls_context or \
-            ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        self._tls_context = tls_context or ssl.create_default_context(
+            ssl.Purpose.CLIENT_AUTH
+        )
 
         self._timeout = timeout
         self._idle_timeout = idle_timeout
@@ -137,10 +149,16 @@ class HttpClient:
         self._raise_error = raise_error
 
         self._conns: MutableMapping[
-            connection.HttpConnectionId, connection.HttpConnection] = \
-            collections.OrderedDict()
+            connection.HttpConnectionId, connection.HttpConnection
+        ] = collections.OrderedDict()
+
+        self._resolver = resolver or resolvers.DefaultResolver()
 
         self._lock = _ClientLock()
+
+    @property
+    def resolver(self) -> resolvers.BaseResolver:
+        return self._resolver
 
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
@@ -161,9 +179,13 @@ class HttpClient:
             tls_context = None
 
         return connection.HttpConnection(
-            __id, max_initial_size=self._max_initial_size,
-            tls_context=tls_context, chunk_size=self._chunk_size,
-            idle_timeout=self._idle_timeout)
+            __id,
+            max_initial_size=self._max_initial_size,
+            tls_context=tls_context,
+            chunk_size=self._chunk_size,
+            idle_timeout=self._idle_timeout,
+            resolver=self._resolver,
+        )
 
     async def _put_conn(self, __conn: connection.HttpConnection) -> None:
         if __conn.closing() or self._allow_keep_alive is False:
@@ -201,12 +223,15 @@ class HttpClient:
         await self.close()
 
     async def _handle_redirection(
-            self, __request: messages.PendingRequest, *,
-            read_response_body: bool,
-            timeout: Optional[int],
-            max_redirects: Optional[int],
-            max_body_size: Optional[int],
-            raise_error: Optional[bool]) -> messages.Response:
+        self,
+        __request: messages.PendingRequest,
+        *,
+        read_response_body: bool,
+        timeout: Optional[int],
+        max_redirects: Optional[int],
+        max_body_size: Optional[int],
+        raise_error: Optional[bool],
+    ) -> messages.Response:
         if max_redirects is None:
             _max_redirects = self._max_redirects
 
@@ -221,7 +246,8 @@ class HttpClient:
                     timeout=timeout,
                     follow_redirection=False,
                     max_body_size=max_body_size,
-                    raise_error=raise_error)
+                    raise_error=raise_error,
+                )
 
             else:
                 try:
@@ -236,11 +262,16 @@ class HttpClient:
                 if _ABSOLUTE_PATH_RE.match(location) is None:
                     raise exceptions.FailedRedirection(
                         "Redirection support for relative path "
-                        "is not implemented.")
+                        "is not implemented."
+                    )
 
                 if location.startswith("/"):
-                    location = __request.scheme.value.lower() + "://" \
-                        + __request.authority + location
+                    location = (
+                        __request.scheme.value.lower()
+                        + "://"
+                        + __request.authority
+                        + location
+                    )
 
                 if response.status_code < 304:
                     method = constants.HttpRequestMethod.GET
@@ -256,7 +287,8 @@ class HttpClient:
                     except NotImplementedError as e:
                         raise exceptions.FailedRedirection(
                             "seek_front is not implemented for"
-                            " current body.") from e
+                            " current body."
+                        ) from e
                     headers = __request.headers
 
                 response = await self.fetch(
@@ -266,7 +298,8 @@ class HttpClient:
                     body=body,
                     read_response_body=read_response_body,
                     timeout=timeout,
-                    raise_error=raise_error)
+                    raise_error=raise_error,
+                )
 
             if response.status_code not in (301, 302, 303, 307, 308):
                 return response
@@ -275,13 +308,15 @@ class HttpClient:
             raise exceptions.TooManyRedirects(response.request)
 
     async def send_request(
-            self, __request: messages.PendingRequest, *,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __request: messages.PendingRequest,
+        *,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         if follow_redirection:
             return await self._handle_redirection(
@@ -290,22 +325,31 @@ class HttpClient:
                 timeout=timeout,
                 max_redirects=max_redirects,
                 max_body_size=max_body_size,
-                raise_error=raise_error)
+                raise_error=raise_error,
+            )
 
         async with self._lock.read_lock:
             _timeout = timeout if timeout is not None else self._timeout
-            _max_body_size = max_body_size if max_body_size is not None else \
-                self._max_body_size
-            _raise_error = raise_error if raise_error is not None else \
-                self._raise_error
+            _max_body_size = (
+                max_body_size
+                if max_body_size is not None
+                else self._max_body_size
+            )
+            _raise_error = (
+                raise_error if raise_error is not None else self._raise_error
+            )
 
             conn = await self._get_conn(__request.conn_id, timeout=_timeout)
 
             try:
-                response = await asyncio.wait_for(conn.send_request(
-                    __request, read_response_body=read_response_body,
-                    max_body_size=_max_body_size),
-                    _timeout)
+                response = await asyncio.wait_for(
+                    conn.send_request(
+                        __request,
+                        read_response_body=read_response_body,
+                        max_body_size=_max_body_size,
+                    ),
+                    _timeout,
+                )
 
             except asyncio.TimeoutError as e:
                 conn.close()
@@ -328,33 +372,35 @@ class HttpClient:
             return response
 
     async def fetch(
-            self, __method: constants.HttpRequestMethod, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-
-            body: Optional[_BODY] = None,
-            json: Optional[Any] = None,
-
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-
-            raise_error: Optional[bool] = None
+        self,
+        __method: constants.HttpRequestMethod,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        body: Optional[_BODY] = None,
+        json: Optional[Any] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         async with self._lock.read_lock:
             if None not in (body, json):
                 raise ValueError(
-                    "You cannot supply both body and json argument.")
+                    "You cannot supply both body and json argument."
+                )
 
             parsed_url = urllib.parse.urlsplit(__url, scheme="http")
-            final_path_args: magicdict.TolerantMagicDict[str, str] = \
-                magicdict.TolerantMagicDict()
+            final_path_args: magicdict.TolerantMagicDict[
+                str, str
+            ] = magicdict.TolerantMagicDict()
 
             if parsed_url.query:
                 final_path_args.update(
-                    urllib.parse.parse_qsl(parsed_url.query))
+                    urllib.parse.parse_qsl(parsed_url.query)
+                )
 
             if path_args:
                 final_path_args.update(path_args)
@@ -378,10 +424,15 @@ class HttpClient:
                 content_type = None
 
             request = messages.PendingRequest(
-                __method, authority=parsed_url.netloc,
+                __method,
+                authority=parsed_url.netloc,
                 path=parsed_url.path or "/",
-                path_args=final_path_args, scheme=parsed_url.scheme,
-                headers=headers, version=constants.HttpVersion.V1_1, body=body)
+                path_args=final_path_args,
+                scheme=parsed_url.scheme,
+                headers=headers,
+                version=constants.HttpVersion.V1_1,
+                body=body,
+            )
 
             if content_type:
                 request.headers["content-type"] = content_type
@@ -393,328 +444,410 @@ class HttpClient:
                 follow_redirection=follow_redirection,
                 max_redirects=max_redirects,
                 max_body_size=max_body_size,
-                raise_error=raise_error)
+                raise_error=raise_error,
+            )
 
     async def head(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.HEAD, __url,
-            path_args=path_args, headers=headers, timeout=timeout,
+            constants.HttpRequestMethod.HEAD,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
     async def get(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.GET, __url,
-            path_args=path_args, headers=headers,
-            read_response_body=read_response_body, timeout=timeout,
+            constants.HttpRequestMethod.GET,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
     async def post(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            body: Optional[_BODY] = None,
-            json: Optional[Any] = None,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        body: Optional[_BODY] = None,
+        json: Optional[Any] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.POST, __url,
-            path_args=path_args, headers=headers, body=body, json=json,
-            read_response_body=read_response_body, timeout=timeout,
+            constants.HttpRequestMethod.POST,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            body=body,
+            json=json,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
     async def put(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            body: Optional[_BODY] = None,
-            json: Optional[Any] = None,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        body: Optional[_BODY] = None,
+        json: Optional[Any] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.PUT, __url,
-            path_args=path_args, headers=headers, body=body, json=json,
-            read_response_body=read_response_body, timeout=timeout,
+            constants.HttpRequestMethod.PUT,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            body=body,
+            json=json,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
     async def delete(
-        self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            body: Optional[_BODY] = None,
-            json: Optional[Any] = None,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        body: Optional[_BODY] = None,
+        json: Optional[Any] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.DELETE, __url,
-            path_args=path_args, headers=headers, body=body, json=json,
-            read_response_body=read_response_body, timeout=timeout,
+            constants.HttpRequestMethod.DELETE,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            body=body,
+            json=json,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
     async def patch(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            body: Optional[_BODY] = None,
-            json: Optional[Any] = None,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        body: Optional[_BODY] = None,
+        json: Optional[Any] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.PATCH, __url,
-            path_args=path_args, headers=headers, body=body, json=json,
-            read_response_body=read_response_body, timeout=timeout,
+            constants.HttpRequestMethod.PATCH,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            body=body,
+            json=json,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
     async def options(
-            self, __url: str,
-            path_args: Optional[Mapping[str, str]] = None,
-            headers: Optional[Mapping[str, str]] = None,
-            read_response_body: bool = True,
-            timeout: Optional[int] = None,
-            follow_redirection: bool = False,
-            max_redirects: Optional[int] = None,
-            max_body_size: Optional[int] = None,
-            raise_error: Optional[bool] = None
+        self,
+        __url: str,
+        path_args: Optional[Mapping[str, str]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+        read_response_body: bool = True,
+        timeout: Optional[int] = None,
+        follow_redirection: bool = False,
+        max_redirects: Optional[int] = None,
+        max_body_size: Optional[int] = None,
+        raise_error: Optional[bool] = None,
     ) -> messages.Response:
         return await self.fetch(
-            constants.HttpRequestMethod.OPTIONS, __url,
-            path_args=path_args, headers=headers,
-            read_response_body=read_response_body, timeout=timeout,
+            constants.HttpRequestMethod.OPTIONS,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
 
 async def fetch(
-        __method: constants.HttpRequestMethod, __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-
-        body: Optional[_BODY] = None,
-        json: Optional[Any] = None,
-
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-
-        raise_error: Optional[bool] = None
+    __method: constants.HttpRequestMethod,
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    body: Optional[_BODY] = None,
+    json: Optional[Any] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     async with HttpClient() as client:
         return await client.fetch(
-            __method, __url,
-            path_args=path_args, headers=headers,
-            body=body, json=json,
-            read_response_body=read_response_body, timeout=timeout,
+            __method,
+            __url,
+            path_args=path_args,
+            headers=headers,
+            body=body,
+            json=json,
+            read_response_body=read_response_body,
+            timeout=timeout,
             follow_redirection=follow_redirection,
             max_redirects=max_redirects,
             max_body_size=max_body_size,
-            raise_error=raise_error)
+            raise_error=raise_error,
+        )
 
 
 async def head(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.HEAD, __url,
-        path_args=path_args, headers=headers,
+        constants.HttpRequestMethod.HEAD,
+        __url,
+        path_args=path_args,
+        headers=headers,
         timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )
 
 
 async def get(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.GET, __url,
-        path_args=path_args, headers=headers,
-        read_response_body=read_response_body, timeout=timeout,
+        constants.HttpRequestMethod.GET,
+        __url,
+        path_args=path_args,
+        headers=headers,
+        read_response_body=read_response_body,
+        timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
         max_body_size=max_body_size,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )
 
 
 async def post(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        body: Optional[_BODY] = None,
-        json: Optional[Any] = None,
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    body: Optional[_BODY] = None,
+    json: Optional[Any] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.POST, __url,
-        path_args=path_args, headers=headers, body=body, json=json,
-        read_response_body=read_response_body, timeout=timeout,
+        constants.HttpRequestMethod.POST,
+        __url,
+        path_args=path_args,
+        headers=headers,
+        body=body,
+        json=json,
+        read_response_body=read_response_body,
+        timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
         max_body_size=max_body_size,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )
 
 
 async def put(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        body: Optional[_BODY] = None,
-        json: Optional[Any] = None,
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    body: Optional[_BODY] = None,
+    json: Optional[Any] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.PUT, __url,
-        path_args=path_args, headers=headers, body=body, json=json,
-        read_response_body=read_response_body, timeout=timeout,
+        constants.HttpRequestMethod.PUT,
+        __url,
+        path_args=path_args,
+        headers=headers,
+        body=body,
+        json=json,
+        read_response_body=read_response_body,
+        timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
         max_body_size=max_body_size,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )
 
 
 async def delete(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        body: Optional[_BODY] = None,
-        json: Optional[Any] = None,
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    body: Optional[_BODY] = None,
+    json: Optional[Any] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.DELETE, __url,
-        path_args=path_args, headers=headers, body=body, json=json,
-        read_response_body=read_response_body, timeout=timeout,
+        constants.HttpRequestMethod.DELETE,
+        __url,
+        path_args=path_args,
+        headers=headers,
+        body=body,
+        json=json,
+        read_response_body=read_response_body,
+        timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
         max_body_size=max_body_size,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )
 
 
 async def patch(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        body: Optional[_BODY] = None,
-        json: Optional[Any] = None,
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    body: Optional[_BODY] = None,
+    json: Optional[Any] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.PATCH, __url,
-        path_args=path_args, headers=headers, body=body, json=json,
-        read_response_body=read_response_body, timeout=timeout,
+        constants.HttpRequestMethod.PATCH,
+        __url,
+        path_args=path_args,
+        headers=headers,
+        body=body,
+        json=json,
+        read_response_body=read_response_body,
+        timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
         max_body_size=max_body_size,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )
 
 
 async def options(
-        __url: str,
-        path_args: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        read_response_body: bool = True,
-        timeout: Optional[int] = None,
-        follow_redirection: bool = False,
-        max_redirects: Optional[int] = None,
-        max_body_size: Optional[int] = None,
-        raise_error: Optional[bool] = None
+    __url: str,
+    path_args: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
+    read_response_body: bool = True,
+    timeout: Optional[int] = None,
+    follow_redirection: bool = False,
+    max_redirects: Optional[int] = None,
+    max_body_size: Optional[int] = None,
+    raise_error: Optional[bool] = None,
 ) -> messages.Response:
     return await fetch(
-        constants.HttpRequestMethod.OPTIONS, __url,
-        path_args=path_args, headers=headers,
-        read_response_body=read_response_body, timeout=timeout,
+        constants.HttpRequestMethod.OPTIONS,
+        __url,
+        path_args=path_args,
+        headers=headers,
+        read_response_body=read_response_body,
+        timeout=timeout,
         follow_redirection=follow_redirection,
         max_redirects=max_redirects,
         max_body_size=max_body_size,
-        raise_error=raise_error)
+        raise_error=raise_error,
+    )

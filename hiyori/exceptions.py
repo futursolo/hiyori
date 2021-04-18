@@ -31,13 +31,16 @@ __all__ = [
     "HttpError",
     "FailedRedirection",
     "TooManyRedirects",
-    "ConnectionClosed"]
+    "ConnectionClosed",
+    "UnresolvableHost",
+]
 
 
 class BaseHiyoriException(Exception):
     """
     The base class of all hiyori exceptions.
     """
+
     pass
 
 
@@ -45,6 +48,7 @@ class RequestTimeout(BaseHiyoriException, TimeoutError):
     """
     Raised when the server has not responded before timeout.
     """
+
     pass
 
 
@@ -52,6 +56,7 @@ class BadResponse(BaseHiyoriException):
     """
     Raised when a bad response is received.
     """
+
     pass
 
 
@@ -60,6 +65,7 @@ class ResponseEntityTooLarge(BaseHiyoriException):
     Raised when hiyori received an entity larger than
     :code:`max_initial_size` or :code:`max_body_size`.
     """
+
     pass
 
 
@@ -69,8 +75,11 @@ class HttpError(BaseHiyoriException):
 
         super().__init__(
             "HTTP {} {}: ".format(
-                int(self.status_code), self.status_code.phrase),
-            *args, str(self._response))
+                int(self.status_code), self.status_code.phrase
+            ),
+            *args,
+            str(self._response),
+        )
 
     @property
     def response(self) -> "messages.Response":
@@ -89,6 +98,7 @@ class FailedRedirection(BaseHiyoriException):
     """
     Raised with hiyori cannot fulfill the redirection request.
     """
+
     pass
 
 
@@ -111,4 +121,13 @@ class ConnectionClosed(BaseHiyoriException):
     """
     Raised when the connection is being closed unexpectedly.
     """
+
+    pass
+
+
+class UnresolvableHost(BaseHiyoriException):
+    """
+    Raised when the resolver has failed to resolve the host.
+    """
+
     pass

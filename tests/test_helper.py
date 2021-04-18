@@ -30,12 +30,12 @@ class _SkeletonServer(asyncio.Protocol):
             return
 
         self._mock_srv = helper.mock_srv_cls()
-        helper.mock_srv = self._mock_srv
 
         self._mock_srv.connection_made(transport)
 
     def data_received(self, data):
         print(f"Data received: {data!r}.")
+        helper.mock_srv = self._mock_srv
 
         self._mock_srv.data_received(data)
 
@@ -86,8 +86,11 @@ class _TestHelper:
         self.mock_srv = None
         self.mock_srv_cls = None
 
-        self._srv = self.loop.run_until_complete(self.loop.create_server(
-            _SkeletonServer, host="localhost", port=8000))
+        self._srv = self.loop.run_until_complete(
+            self.loop.create_server(
+                _SkeletonServer, host="localhost", port=8000
+            )
+        )
 
     def run_async_test(self, *args, with_srv_cls=None):
         def decorator(coro_fn):
@@ -98,7 +101,8 @@ class _TestHelper:
 
                 try:
                     await asyncio.wait_for(
-                        coro_fn(_self, *args, **kwargs), timeout=5)
+                        coro_fn(_self, *args, **kwargs), timeout=5
+                    )
 
                 except Exception as e:
                     exc = e

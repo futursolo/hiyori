@@ -20,6 +20,7 @@ from typing import NamedTuple, Optional
 from . import messages
 from . import exceptions
 from . import constants
+from . import resolvers
 
 import asyncio
 import magichttp
@@ -54,9 +55,15 @@ class HttpConnection:
     """
 
     def __init__(
-        self, __conn_id: HttpConnectionId, *, max_initial_size: int,
-            chunk_size: int, tls_context: Optional[ssl.SSLContext],
-            idle_timeout: int) -> None:
+        self,
+        __conn_id: HttpConnectionId,
+        *,
+        max_initial_size: int,
+        chunk_size: int,
+        tls_context: Optional[ssl.SSLContext],
+        idle_timeout: int,
+        resolver: resolvers.BaseResolver,
+    ) -> None:
         self.conn_id = __conn_id
 
         self._max_initial_size = max_initial_size
@@ -66,6 +73,8 @@ class HttpConnection:
 
         self._idle_timer: Optional[asyncio.Handle] = None
         self._set_idle_timeout()
+
+        self._resolver = resolver
 
         self._protocol: Optional[magichttp.HttpClientProtocol] = None
         self._closing = asyncio.Event()
@@ -87,8 +96,10 @@ class HttpConnection:
         if self.closing():
             raise RuntimeError("This connection is closing.")
 
-        if self._protocol is not None and \
-                not self._protocol.transport.is_closing():
+        if (
+            self._protocol is not None
+            and not self._protocol.transport.is_closing()
+        ):
             return
 
         def create_conn() -> magichttp.HttpClientProtocol:
@@ -97,19 +108,21 @@ class HttpConnection:
 
             return _Protocol(http_version=self.conn_id.http_version)
 
-        loop = asyncio.get_event_loop()
+        result = await self._resolver.lookup(
+            self.conn_id.hostname, self.conn_id.port
+        )
 
-        _, self._protocol = await loop.create_connection(  # type: ignore
-            create_conn,
-            host=self.conn_id.hostname,
-            port=self.conn_id.port,
-
-            ssl=self._tls_context)
+        _, self._protocol = await result.connect_fastest(
+            create_conn, self._tls_context
+        )
 
     async def send_request(
-        self, __request: "messages.PendingRequest", *,
-            read_response_body: bool,
-            max_body_size: int) -> "messages.Response":
+        self,
+        __request: "messages.PendingRequest",
+        *,
+        read_response_body: bool,
+        max_body_size: int,
+    ) -> "messages.Response":
         await self.get_ready()
         assert self._protocol is not None
 
@@ -128,7 +141,8 @@ class HttpConnection:
                 __request.method,
                 uri=__request.uri,
                 authority=__request.authority,
-                headers=__request.headers)
+                headers=__request.headers,
+            )
 
             while True:
                 try:
@@ -149,13 +163,15 @@ class HttpConnection:
                 try:
                     while True:
                         body_buf += await reader.read(
-                            max_body_size + 1 - len(body_buf))
+                            max_body_size + 1 - len(body_buf)
+                        )
 
                         if len(body_buf) > max_body_size:
                             reader.abort()
 
                             raise exceptions.ResponseEntityTooLarge(
-                                "Response body is too large.")
+                                "Response body is too large."
+                            )
 
                 except magichttp.ReadFinishedError:
                     res_body = bytes(body_buf)
@@ -164,9 +180,11 @@ class HttpConnection:
                 res_body = b""
                 self.close()
 
-        except (magichttp.ReadAbortedError,
-                magichttp.WriteAbortedError,
-                magichttp.WriteAfterFinishedError) as e:
+        except (
+            magichttp.ReadAbortedError,
+            magichttp.WriteAbortedError,
+            magichttp.WriteAfterFinishedError,
+        ) as e:
             raise exceptions.ConnectionClosed("Connection closed.") from e
 
         except magichttp.ReceivedDataMalformedError as e:
@@ -178,7 +196,8 @@ class HttpConnection:
         self._set_idle_timeout()
 
         return messages.Response(
-            messages.Request(writer), reader=reader, body=res_body, conn=self)
+            messages.Request(writer), reader=reader, body=res_body, conn=self
+        )
 
     def close(self) -> None:
         self._closing.set()

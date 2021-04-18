@@ -15,9 +15,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori import HttpClient, HttpRequestMethod, HttpVersion, \
-    TooManyRedirects, FailedRedirection, HttpError, ConnectionClosed, get, \
-    ResponseEntityTooLarge, BadResponse
+from hiyori import (
+    HttpClient,
+    HttpRequestMethod,
+    HttpVersion,
+    TooManyRedirects,
+    FailedRedirection,
+    HttpError,
+    ConnectionClosed,
+    get,
+    ResponseEntityTooLarge,
+    BadResponse,
+)
 
 from test_helper import helper, MockServer
 
@@ -30,7 +39,8 @@ class GetEchoServer(MockServer):
         super().connection_made(transport)
 
         transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class JsonResponseServer(MockServer):
@@ -38,7 +48,8 @@ class JsonResponseServer(MockServer):
         super().connection_made(transport)
 
         transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{\"a\": \"b\"}")
+            b'HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{"a": "b"}'
+        )
 
 
 class AlwaysRedirectServer(MockServer):
@@ -47,7 +58,8 @@ class AlwaysRedirectServer(MockServer):
 
         self.transport.write(
             b"HTTP/1.1 302 Found\r\nLocation: /\r\n"
-            b"Content-Length: 0\r\n\r\n")
+            b"Content-Length: 0\r\n\r\n"
+        )
 
 
 class Redirect10TimesServer(MockServer):
@@ -57,10 +69,12 @@ class Redirect10TimesServer(MockServer):
         for _ in range(0, 10):
             transport.write(
                 b"HTTP/1.1 302 Found\r\nLocation: /\r\n"
-                b"Content-Length: 0\r\n\r\n")
+                b"Content-Length: 0\r\n\r\n"
+            )
 
         transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class RelativeRedirectServer(MockServer):
@@ -69,10 +83,12 @@ class RelativeRedirectServer(MockServer):
 
         transport.write(
             b"HTTP/1.1 302 Found\r\nLocation: ../\r\n"
-            b"Content-Length: 0\r\n\r\n")
+            b"Content-Length: 0\r\n\r\n"
+        )
 
         transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class Http404Server(MockServer):
@@ -81,15 +97,15 @@ class Http404Server(MockServer):
 
         transport.write(
             b"HTTP/1.1 404 Not Found\r\nContent-Length: 19\r\n\r\n"
-            b"HTTP 404: Not Found")
+            b"HTTP 404: Not Found"
+        )
 
 
 class ConnectionClosedServer(MockServer):
     def connection_made(self, transport):
         super().connection_made(transport)
 
-        transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello,")
+        transport.write(b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello,")
         transport.close()
 
 
@@ -105,7 +121,8 @@ class MalformedServer(MockServer):
         super().connection_made(transport)
 
         transport.write(
-            b"HTTP/1.2 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+            b"HTTP/1.2 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class GetTestCase:
@@ -123,19 +140,19 @@ class GetTestCase:
         assert response.request.uri == "/"
         assert response.request.authority == "localhost:8000"
         assert not hasattr(response.request, "scheme")
-        assert response.request.headers == \
-            {
-                "user-agent": helper.get_version_str(),
-                "accept": "*/*",
-                "host": "localhost:8000"
-            }
+        assert response.request.headers == {
+            "user-agent": helper.get_version_str(),
+            "accept": "*/*",
+            "host": "localhost:8000",
+        }
 
         helper.assert_initial_bytes(
             b"".join(helper.mock_srv.data_chunks),
             b"GET / HTTP/1.1",
             b"User-Agent: %(self_ver_bytes)s",
             b"Accept: */*",
-            b"Host: localhost:8000")
+            b"Host: localhost:8000",
+        )
 
     @helper.run_async_test(with_srv_cls=JsonResponseServer)
     async def test_json(self):
@@ -150,13 +167,15 @@ class GetTestCase:
                 b"GET / HTTP/1.1",
                 b"User-Agent: %(self_ver_bytes)s",
                 b"Accept: */*",
-                b"Host: localhost:8000")
+                b"Host: localhost:8000",
+            )
 
     @helper.run_async_test(with_srv_cls=GetEchoServer)
     async def test_path_args(self):
         async with HttpClient() as client:
             response = await client.get(
-                "http://localhost:8000/?a=b", path_args={"c": "d"})
+                "http://localhost:8000/?a=b", path_args={"c": "d"}
+            )
 
             assert response.status_code == 200
             assert response.body == b"Hello, World!"
@@ -166,7 +185,8 @@ class GetTestCase:
                 b"GET /?a=b&c=d HTTP/1.1",
                 b"User-Agent: %(self_ver_bytes)s",
                 b"Accept: */*",
-                b"Host: localhost:8000")
+                b"Host: localhost:8000",
+            )
 
     @helper.run_async_test(with_srv_cls=AlwaysRedirectServer)
     async def test_default_no_redirect(self):
@@ -180,7 +200,8 @@ class GetTestCase:
     async def test_redirect_successful(self):
         async with HttpClient() as client:
             response = await client.get(
-                "http://localhost:8000/", follow_redirection=True)
+                "http://localhost:8000/", follow_redirection=True
+            )
 
             assert response.status_code == 200
             assert response.body == b"Hello, World!"
@@ -190,14 +211,16 @@ class GetTestCase:
         async with HttpClient() as client:
             with pytest.raises(TooManyRedirects):
                 await client.get(
-                    "http://localhost:8000/", follow_redirection=True)
+                    "http://localhost:8000/", follow_redirection=True
+                )
 
     @helper.run_async_test(with_srv_cls=RelativeRedirectServer)
     async def test_prevent_relative_redirect(self):
         async with HttpClient() as client:
             with pytest.raises(FailedRedirection):
                 await client.get(
-                    "http://localhost:8000/", follow_redirection=True)
+                    "http://localhost:8000/", follow_redirection=True
+                )
 
     @helper.run_async_test(with_srv_cls=Http404Server)
     async def test_response_404(self):
