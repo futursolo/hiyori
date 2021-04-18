@@ -54,3 +54,6 @@ class ProvidedResolver(base.BaseResolver):
             raise exceptions.UnresolvableHost(
                 f"Failed to resolve {host}:{port}"
             ) from e
+
+
+__all__ = ["ProvidedResolver"]

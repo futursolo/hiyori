@@ -118,7 +118,7 @@ class ResolvedResult:
 
         # Create a task for each result.
         coros = {
-            record: asyncio.create_task(
+            record: asyncio.ensure_future(
                 open_connection(
                     record,
                     host=self.host,
@@ -147,7 +147,7 @@ class ResolvedResult:
 
         try:
             while len(pending) > 0:
-                _, pending = await asyncio.wait(  # type: ignore
+                _, pending = await asyncio.wait(
                     pending,
                     return_when=asyncio.FIRST_COMPLETED,
                 )
