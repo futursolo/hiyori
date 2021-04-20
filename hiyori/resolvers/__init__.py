@@ -17,14 +17,22 @@
 
 from typing import Type
 from .base import ResolvedResult, BaseResolver
-from .provided import ProvidedResolver
-
-DefaultResolver: Type[BaseResolver] = ProvidedResolver
-
+from .system import SystemResolver
+from .hosts import HostsResolver
 
 __all__ = [
     "ResolvedResult",
     "BaseResolver",
-    "ProvidedResolver",
+    "SystemResolver",
+    "HostsResolver",
     "DefaultResolver",
 ]
+
+try:
+    from .async_ import AsyncResolver
+
+    DefaultResolver: Type[BaseResolver] = AsyncResolver
+    __all__.append("AsyncResolver")
+
+except ImportError:
+    DefaultResolver = SystemResolver

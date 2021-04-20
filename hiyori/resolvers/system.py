@@ -22,12 +22,21 @@ import asyncio
 import ipaddress
 
 
-class ProvidedResolver(base.BaseResolver):
+class SystemResolver(base.BaseResolver):
     """
     This resolver implements the `getaddrinfo()` provided by the event loop.
 
     This is the fallback implementation when no other implementation is
     available.
+
+    This implementation is perfectly fine to be used when the operating
+    system already caches DNS requests. This is the case on Windows, macOS and
+    FreeBSD with :code:`local_unbound` enabled.
+
+    .. important::
+
+        This implementation will always look up the hosts file as it uses
+        operating system mechanism to resolve hostnames.
     """
 
     async def lookup_now(self, host: str, port: int) -> base.ResolvedResult:
@@ -56,4 +65,4 @@ class ProvidedResolver(base.BaseResolver):
             ) from e
 
 
-__all__ = ["ProvidedResolver"]
+__all__ = ["SystemResolver"]

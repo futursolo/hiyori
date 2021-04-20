@@ -62,7 +62,6 @@ async def open_connection(
         ssl=tls_ctx,
         server_hostname=host if tls_ctx else None,
     )
-    raise NotImplementedError
 
 
 class ResolvedResult:
@@ -184,7 +183,6 @@ class BaseResolver(abc.ABC):
 
     This class defines methods that all resolvers should implement.
 
-    :arg respect_host_file: Whether to look up in host file first.
     :arg min_ttl: The minimum seconds to wait for records before requerying.
     :arg respect_remote_ttl: Whether to respect the ttl provided by the
         backend if one is available and higher than :code:`min_ttl`.
@@ -192,11 +190,10 @@ class BaseResolver(abc.ABC):
 
     def __init__(
         self,
-        respect_host_file: bool = True,
+        *,
         min_ttl: int = 60,
         respect_remote_ttl: bool = True,
     ) -> None:
-        self._respect_host_file = respect_host_file
         self._min_ttl = min_ttl
         self._respect_remote_ttl = respect_remote_ttl
 
@@ -256,5 +253,7 @@ class BaseResolver(abc.ABC):
         This should send the request immediately to the underlying
         implementation. If the underlying implementation has caching mechanism
         that can be disabled / bypassed. Then it should be disabled / bypassed.
+
+        All resolvers MUST implement this method.
         """
         raise NotImplementedError
