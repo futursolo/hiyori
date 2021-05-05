@@ -50,7 +50,7 @@ class HostsResolver(base.BaseResolver):
         *,
         min_ttl: int = 60,
         respect_remote_ttl: bool = True,
-        host_path: Union[str, os.PathLike[str]] = _SYSTEM_DEFAULT_HOST_PATH,
+        host_path: Union[str, "os.PathLike[str]"] = _SYSTEM_DEFAULT_HOST_PATH,
     ) -> None:
         super().__init__(
             min_ttl=min_ttl, respect_remote_ttl=respect_remote_ttl
