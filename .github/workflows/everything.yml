@@ -9,7 +9,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [3.6, 3.7, 3.8, 3.9]
-        os: [macOS, Ubuntu, Windows]
+        os: [macOS, Ubuntu]
 
     steps:
       - uses: actions/checkout@v2
@@ -30,7 +30,7 @@ jobs:
 
       - name: Mypy
         run: |
-          mypy --python-version ${{ matrix.python-version }} --strict --show-traceback --ignore-missing-imports --show-error-context --implicit-reexport --pretty -p hiyori
+          mypy --python-version 3.9 --strict --show-traceback --ignore-missing-imports --show-error-context --implicit-reexport --pretty -p hiyori
 
       - name: Lint with flake8
         run: |
@@ -46,6 +46,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_FLAG_NAME: ${{ matrix.os }} with Python ${{ matrix.python-version }}
           COVERALLS_PARALLEL: true
+          COVERALLS_SERVICE_NAME: github
 
   coveralls:
     name: Finish Coveralls
@@ -53,12 +54,13 @@ jobs:
     runs-on: ubuntu-latest
     container: python:3-slim
     steps:
-    - name: All Testing Finished
-      run: |
-        pip3 install --upgrade coveralls
-        coveralls --finish
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: All Testing Finished
+        run: |
+          pip3 install --upgrade coveralls
+          coveralls --finish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_SERVICE_NAME: github
 
   upload_pypi:
     name: Upload to PyPI
