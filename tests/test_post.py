@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ class PostEchoServer(MockServer):
         super().connection_made(transport)
 
         transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class PostTestCase:
@@ -45,31 +46,31 @@ class PostTestCase:
         assert response.request.uri == "/"
         assert response.request.authority == "localhost:8000"
         assert not hasattr(response.request, "scheme")
-        assert response.request.headers == \
-            {
-                "user-agent": helper.get_version_str(),
-                "content-length": "10",
-                "accept": "*/*",
-                "host": "localhost:8000"
-            }
+        assert response.request.headers == {
+            "user-agent": helper.get_version_str(),
+            "content-length": "10",
+            "accept": "*/*",
+            "host": "localhost:8000",
+        }
 
     @helper.run_async_test(with_srv_cls=PostEchoServer)
     async def test_urlencoded_body(self):
         async with HttpClient() as client:
             response = await client.post(
-                "http://localhost:8000", body={"a": "b", "c": "d"})
+                "http://localhost:8000", body={"a": "b", "c": "d"}
+            )
 
-        assert response.request.headers == \
-            {
-                "user-agent": helper.get_version_str(),
-                "content-type": "application/x-www-form-urlencoded",
-                "content-length": "7",
-                "accept": "*/*",
-                "host": "localhost:8000"
-            }
+        assert response.request.headers == {
+            "user-agent": helper.get_version_str(),
+            "content-type": "application/x-www-form-urlencoded",
+            "content-length": "7",
+            "accept": "*/*",
+            "host": "localhost:8000",
+        }
 
         initial_bytes, body = b"".join(helper.mock_srv.data_chunks).split(
-            b"\r\n\r\n", 1)
+            b"\r\n\r\n", 1
+        )
 
         helper.assert_initial_bytes(
             initial_bytes,
@@ -78,7 +79,8 @@ class PostTestCase:
             b"Content-Type: application/x-www-form-urlencoded",
             b"Content-Length: 7",
             b"Accept: */*",
-            b"Host: localhost:8000")
+            b"Host: localhost:8000",
+        )
 
         assert body == b"a=b&c=d"
 
@@ -86,19 +88,20 @@ class PostTestCase:
     async def test_json_body(self):
         async with HttpClient() as client:
             response = await client.post(
-                "http://localhost:8000", json={"a": "b", "c": [1, 2]})
+                "http://localhost:8000", json={"a": "b", "c": [1, 2]}
+            )
 
-            assert response.request.headers == \
-                {
-                    "user-agent": helper.get_version_str(),
-                    "content-type": "application/json",
-                    "content-length": "23",
-                    "accept": "*/*",
-                    "host": "localhost:8000"
-                }
+            assert response.request.headers == {
+                "user-agent": helper.get_version_str(),
+                "content-type": "application/json",
+                "content-length": "23",
+                "accept": "*/*",
+                "host": "localhost:8000",
+            }
 
             initial_bytes, body = b"".join(helper.mock_srv.data_chunks).split(
-                b"\r\n\r\n", 1)
+                b"\r\n\r\n", 1
+            )
 
             helper.assert_initial_bytes(
                 initial_bytes,
@@ -107,7 +110,8 @@ class PostTestCase:
                 b"Content-Type: application/json",
                 b"Content-Length: 23",
                 b"Accept: */*",
-                b"Host: localhost:8000")
+                b"Host: localhost:8000",
+            )
 
             assert body == b'{"a": "b", "c": [1, 2]}'
 
@@ -116,4 +120,5 @@ class PostTestCase:
         async with HttpClient() as client:
             with pytest.raises(ValueError):
                 await client.post(
-                    "http://localhost:8000", body={"a": "b"}, json={"c": "d"})
+                    "http://localhost:8000", body={"a": "b"}, json={"c": "d"}
+                )

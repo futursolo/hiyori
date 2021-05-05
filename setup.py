@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -22,11 +22,17 @@ import sys
 if not sys.version_info[:3] >= (3, 6, 1):
     raise RuntimeError("Hiyori requires Python 3.6.1 or higher.")
 
-setup_requires = ["setuptools>=50",
-                  "pytest-runner>=5.2,<6", "setuptools-scm>=4.1.2"]
+setup_requires = [
+    "setuptools>=50",
+    "pytest-runner>=5.2,<6",
+    "setuptools-scm>=4.1.2",
+]
 
-install_requires = ["magichttp>=1.1.1,<2", "magicdict>=1.0.6,<2",
-                    "importlib-metadata>=1.7.0;python_version<'3.8'"]
+install_requires = [
+    "magichttp>=1.1.1,<2",
+    "magicdict>=1.0.6,<2",
+    "importlib-metadata>=1.7.0;python_version<'3.8'",
+]
 
 tests_require = ["pytest>=6.0.1,<7", "mypy>=0.782,<1", "flake8>=3.8.3,<4"]
 
@@ -47,9 +53,7 @@ if __name__ == "__main__":
         setup_requires=setup_requires,
         install_requires=install_requires,
         tests_require=tests_require,
-        extras_require={
-            "test": tests_require
-        },
+        extras_require={"test": tests_require},
         zip_safe=False,
         classifiers=[
             "Operating System :: MacOS",
@@ -61,6 +65,6 @@ if __name__ == "__main__":
             "Operating System :: Unix",
             "Programming Language :: Python",
             "Programming Language :: Python :: 3 :: Only",
-            "Programming Language :: Python :: Implementation :: CPython"
-        ]
+            "Programming Language :: Python :: Implementation :: CPython",
+        ],
     )

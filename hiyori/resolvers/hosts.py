@@ -15,14 +15,30 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
+from __future__ import annotations
 from typing import Dict, Union, List
 
 import time
 import ipaddress
+import os
+import pathlib
+import platform
 
 from . import base
 from .. import exceptions
+
+
+if platform.system() == "Windows":
+    _SYSTEM_DEFAULT_HOST_PATH = (
+        pathlib.Path(os.environ["SystemRoot"])
+        / "system32"
+        / "drivers"
+        / "etc"
+        / "hosts"
+    )
+
+else:
+    _SYSTEM_DEFAULT_HOST_PATH = pathlib.Path("/etc/hosts")
 
 
 class HostsResolver(base.BaseResolver):
@@ -35,6 +51,7 @@ class HostsResolver(base.BaseResolver):
         *,
         min_ttl: int = 60,
         respect_remote_ttl: bool = True,
+        host_path: Union[str, os.PathLike[str]] = _SYSTEM_DEFAULT_HOST_PATH,
     ) -> None:
         super().__init__(
             min_ttl=min_ttl, respect_remote_ttl=respect_remote_ttl
@@ -45,18 +62,24 @@ class HostsResolver(base.BaseResolver):
         ] = {}
         self._last_read = -self._min_ttl
 
+        self.host_path = pathlib.Path(host_path)
+
     async def _read_hosts(self) -> None:
         if self._last_read + self._min_ttl > time.monotonic():
             return
 
         self._hosts_content = {}
 
-        with open("/etc/hosts") as f:
-            for line in f.readline():
+        with self.host_path.open() as f:
+            for line in f.readlines():
+                # Remove comments
+                line = line.rstrip().split("#", 1)[0]
+
+                if not line:
+                    continue
+
                 try:
-                    host, ip_s = [
-                        i.strip() for i in line.split(" ") if i.strip()
-                    ]
+                    ip_s, host = [i.strip() for i in line.split() if i.strip()]
 
                     ip = ipaddress.ip_address(ip_s)
 
@@ -84,7 +107,7 @@ class HostsResolver(base.BaseResolver):
                 ttl=self._min_ttl,
             )
 
-        except OSError as e:
+        except (KeyError, OSError) as e:
             raise exceptions.UnresolvableHost(
                 f"Failed to resolve {host}:{port}"
             ) from e

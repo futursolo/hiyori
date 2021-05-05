@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -27,27 +27,29 @@ import magicdict
 import magichttp
 import warnings
 
-__all__ = [
-    "PendingRequest",
-    "Request",
-    "Response"]
+__all__ = ["PendingRequest", "Request", "Response"]
 
 _SELF_IDENTIFIER = "hiyori/{} magichttp/{}".format(
-    _version.__version__, magichttp.__version__)
+    _version.__version__, magichttp.__version__
+)
 
 
 class PendingRequest:
     def __init__(
-        self, __method: constants.HttpRequestMethod, *,
-        authority: str, path: str = "/",
+        self,
+        __method: constants.HttpRequestMethod,
+        *,
+        authority: str,
+        path: str = "/",
         path_args: Optional[Mapping[str, str]] = None,
         scheme: Union[str, constants.HttpScheme] = constants.HttpScheme.HTTP,
         headers: Optional[Mapping[str, str]] = None,
         version: constants.HttpVersion = constants.HttpVersion.V1_1,
-        body: Optional[Union[bytes, bodies.BaseRequestBody]] = None
+        body: Optional[Union[bytes, bodies.BaseRequestBody]] = None,
     ) -> None:
-        assert path.find("?") == -1, \
-            "Please pass path arguments using path_args keyword argument."
+        assert (
+            path.find("?") == -1
+        ), "Please pass path arguments using path_args keyword argument."
 
         self._method = __method
         self._version = version
@@ -63,8 +65,9 @@ class PendingRequest:
         self._path = path
         self._path_args = path_args
 
-        self._headers: magicdict.TolerantMagicDict[str, str] = \
-            magicdict.TolerantMagicDict(headers or {})
+        self._headers: magicdict.TolerantMagicDict[
+            str, str
+        ] = magicdict.TolerantMagicDict(headers or {})
         self._headers.setdefault("user-agent", _SELF_IDENTIFIER)
 
         self._cached_uri: Optional[str] = None
@@ -90,8 +93,9 @@ class PendingRequest:
             self._cached_uri = self._path
 
             if self._path_args:
-                self._cached_uri += "?" + \
-                    urllib.parse.urlencode(self._path_args)
+                self._cached_uri += "?" + urllib.parse.urlencode(
+                    self._path_args
+                )
 
         return self._cached_uri
 
@@ -116,7 +120,8 @@ class PendingRequest:
         return connection.HttpConnectionId(
             http_version=self.version,
             authority=self.authority,
-            scheme=self.scheme)
+            scheme=self.scheme,
+        )
 
     def __repr__(self) -> str:  # pragma: no cover
         parts = [
@@ -125,7 +130,8 @@ class PendingRequest:
             f"uri={self.uri!r}",
             f"authority={self.authority!r}",
             f"scheme={self.scheme!r}",
-            f"headers={self.headers!r}"]
+            f"headers={self.headers!r}",
+        ]
 
         return f"<{self.__class__.__name__} {', '.join(parts)}>"
 
@@ -165,7 +171,8 @@ class Request:
         parts = [
             f"method={self.method!r}",
             f"version={self.version!r}",
-            f"uri={self.uri!r}"]
+            f"uri={self.uri!r}",
+        ]
 
         try:
             parts.append(f"authority={self.authority!r}")
@@ -189,17 +196,20 @@ class Request:
 
 class Response:
     def __init__(
-        self, request: Request,
+        self,
+        request: Request,
         reader: magichttp.HttpResponseReader,
         conn: "connection.HttpConnection",
-            body: Optional[bytes] = None) -> None:
+        body: Optional[bytes] = None,
+    ) -> None:
         self._request = request
 
         self._reader = reader
         self._conn = conn
 
-        self._body = bodies.ResponseBody(body) \
-            if body else bodies.EMPTY_RESPONSE_BODY
+        self._body = (
+            bodies.ResponseBody(body) if body else bodies.EMPTY_RESPONSE_BODY
+        )
 
     @property
     def request(self) -> Request:
@@ -230,7 +240,8 @@ class Response:
             f"request={self.request!r}",
             f"status_code={self.status_code!r}",
             f"version={self.version!r}",
-            f"headers={self.headers!r}"]
+            f"headers={self.headers!r}",
+        ]
 
         return f"<{self.__class__.__name__} {', '.join(parts)}>"
 
@@ -241,6 +252,7 @@ class Response:
         if not self._reader.finished():
             warnings.warn(
                 "Response body is not being properly retrieved. "
-                "Please read till the end.")
+                "Please read till the end."
+            )
 
             self.reader.abort()

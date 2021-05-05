@@ -36,7 +36,6 @@ try:
         :arg respect_hosts_file: Whether to look up in hosts file.
         :arg dns_servers: List of DNS servers to use. :code:`None` if system
         DNS servers should be used.
-        domain.
         """
 
         def __init__(

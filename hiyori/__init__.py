@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -31,5 +31,12 @@ from . import _version
 from . import bodies
 from . import multipart
 
-__all__ = constants.__all__ + messages.__all__ + exceptions.__all__ + \
-    http_client.__all__ + _version.__all__ + bodies.__all__ + multipart.__all__
+__all__ = (
+    constants.__all__
+    + messages.__all__
+    + exceptions.__all__
+    + http_client.__all__
+    + _version.__all__
+    + bodies.__all__
+    + multipart.__all__
+)

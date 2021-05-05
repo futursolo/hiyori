@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -32,8 +32,9 @@ class _StrField(bodies.BytesRequestBody):
     def __init__(self, name: str, value: str, prefix: bytes) -> None:
         buf = bytearray(prefix)
 
-        buf += "Content-Disposition: form-data; name=\"{}\"\r\n\r\n".format(
-            name).encode("utf-8")
+        buf += 'Content-Disposition: form-data; name="{}"\r\n\r\n'.format(
+            name
+        ).encode("utf-8")
         buf += value.encode("utf-8")
         buf += b"\r\n"
 
@@ -42,8 +43,8 @@ class _StrField(bodies.BytesRequestBody):
 
 class _FileField(bodies.BaseRequestBody):
     def __init__(
-        self, __fp: BinaryIO,
-            headers: Mapping[str, str], prefix: bytes) -> None:
+        self, __fp: BinaryIO, headers: Mapping[str, str], prefix: bytes
+    ) -> None:
         self._fp = __fp
         self._headers = headers
 
@@ -100,10 +101,12 @@ class _FileField(bodies.BaseRequestBody):
 
 class File:
     def __init__(
-        self, __fp: Union[BinaryIO, bytes],
+        self,
+        __fp: Union[BinaryIO, bytes],
         filename: Optional[str] = None,
         content_type: Optional[str] = None,
-            headers: Optional[Mapping[str, str]] = None) -> None:
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         if isinstance(__fp, bytes):
             self._fp: BinaryIO = io.BytesIO(__fp)
 
@@ -113,8 +116,9 @@ class File:
         self._filename = filename
         self._content_type = content_type
 
-        self._headers: magicdict.TolerantMagicDict[str, str] = \
-            magicdict.TolerantMagicDict(headers or {})
+        self._headers: magicdict.TolerantMagicDict[
+            str, str
+        ] = magicdict.TolerantMagicDict(headers or {})
 
     def _to_file_field(self, name: str, prefix: bytes) -> _FileField:
         if "content-type" not in self._headers.keys():
@@ -136,10 +140,10 @@ class File:
 
             self._headers["content-type"] = content_type
 
-        disposition = ["form-data", "name=\"{}\"".format(name)]
+        disposition = ["form-data", 'name="{}"'.format(name)]
 
         if self._filename:
-            disposition.append("filename=\"{}\"".format(self._filename))
+            disposition.append('filename="{}"'.format(self._filename))
 
         self._headers["content-disposition"] = "; ".join(disposition)
 
@@ -148,7 +152,8 @@ class File:
 
 class MultipartRequestBody(bodies.BaseRequestBody):
     def __init__(
-            self, form_dict: Dict[str, Union[str, BinaryIO, File]]) -> None:
+        self, form_dict: Dict[str, Union[str, BinaryIO, File]]
+    ) -> None:
         self._boundary = "--------HiyoriFormBoundary" + str(uuid.uuid4())
 
         field_prefix = b"--" + self._boundary.encode("ascii") + b"\r\n"
@@ -164,10 +169,14 @@ class MultipartRequestBody(bodies.BaseRequestBody):
 
             else:
                 self._parts.append(
-                    File(value)._to_file_field(name, field_prefix))
+                    File(value)._to_file_field(name, field_prefix)
+                )
 
-        self._parts.append(bodies.BytesRequestBody(
-            b"--" + self._boundary.encode("ascii") + b"--\r\n"))
+        self._parts.append(
+            bodies.BytesRequestBody(
+                b"--" + self._boundary.encode("ascii") + b"--\r\n"
+            )
+        )
 
         self._body_len: Optional[int] = None
         self._ptr = 0

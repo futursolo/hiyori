@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ __all__ = [
     "BytesRequestBody",
     "UrlEncodedRequestBody",
     "JsonRequestBody",
-    "ResponseBody"]
+    "ResponseBody",
+]
 
 
 class BaseRequestBody(abc.ABC):  # pragma: no cover
@@ -36,6 +37,7 @@ class BaseRequestBody(abc.ABC):  # pragma: no cover
 
     Subclass this class is you want to create custom request body.
     """
+
     async def calc_len(self) -> int:
         """
         Implementation of this method is optional; however,
@@ -110,6 +112,7 @@ class _EmptyRequestBody(BaseRequestBody):
     """
     Dummy body used when no body should be sent.
     """
+
     async def calc_len(self) -> int:
         return 0
 
@@ -124,8 +127,9 @@ EMPTY_REQUEST_BODY = _EmptyRequestBody()
 
 
 class ResponseBody(bytes):
-    def to_json(self) -> Union[
-            Dict[str, Any], List[Any], int, str, float, bool, None]:
+    def to_json(
+        self,
+    ) -> Union[Dict[str, Any], List[Any], int, str, float, bool, None]:
         return json.loads(self.to_str())  # type: ignore
 
     def to_str(self, encoding: str = "utf-8") -> str:

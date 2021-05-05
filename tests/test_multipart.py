@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#   Copyright 2020 Kaede Hoshikawa
+#   Copyright 2021 Kaede Hoshikawa
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -28,7 +28,8 @@ class MultipartEchoServer(MockServer):
         super().connection_made(transport)
 
         transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!")
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class MultipartTestCase:
@@ -36,7 +37,8 @@ class MultipartTestCase:
     async def test_simple(self):
         await post(
             "http://localhost:8000/",
-            body={"a": "b", "c": io.BytesIO(b"1234567890")})
+            body={"a": "b", "c": io.BytesIO(b"1234567890")},
+        )
 
     @helper.run_async_test
     async def test_detail(self):
@@ -51,7 +53,9 @@ class MultipartTestCase:
             except EOFError:
                 break
 
-        assert body_buf == b"""\
+        assert (
+            body_buf
+            == b"""\
 --%(boundary)s\r
 Content-Disposition: form-data; name="a"\r
 \r
@@ -61,7 +65,9 @@ Content-Type: application/octet-stream\r
 Content-Disposition: form-data; name="c"\r
 \r
 1234567890--%(boundary)s--\r
-""" % {b"boundary": boundary.encode()}
+"""
+            % {b"boundary": boundary.encode()}
+        )
 
     @helper.run_async_test
     async def test_with_file_obj(self):
@@ -71,7 +77,8 @@ Content-Disposition: form-data; name="c"\r
                 "c": File(
                     b"1234567890",
                     filename="abc.example",
-                    content_type="x-application/example")
+                    content_type="x-application/example",
+                ),
             }
         )
         boundary = body.boundary
@@ -84,7 +91,9 @@ Content-Disposition: form-data; name="c"\r
             except EOFError:
                 break
 
-        assert body_buf == b"""\
+        assert (
+            body_buf
+            == b"""\
 --%(boundary)s\r
 Content-Disposition: form-data; name="a"\r
 \r
@@ -94,4 +103,6 @@ Content-Type: x-application/example\r
 Content-Disposition: form-data; name="c"; filename="abc.example"\r
 \r
 1234567890--%(boundary)s--\r
-""" % {b"boundary": boundary.encode()}
+"""
+            % {b"boundary": boundary.encode()}
+        )
