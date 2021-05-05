@@ -24,7 +24,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install wheel
-          pip install --upgrade poetry pip coveralls poetry-dynamic-versioning
+          pip install --upgrade pip
+          pip install --upgrade poetry coveralls poetry-dynamic-versioning
           poetry install
 
       - name: Mypy
