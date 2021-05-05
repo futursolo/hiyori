@@ -607,7 +607,7 @@ aiodns = ["aiodns"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.1"
-content-hash = "cd09f9c30f36de518482d4baa5f460d78a7a542d86e7bb86c3560dc117dd125e"
+content-hash = "4086e72dd1b2793be868f9c2a613c1dd50ef5de9aa30a4e8788c79a322ceeebd"
 
 [metadata.files]
 aiodns = [

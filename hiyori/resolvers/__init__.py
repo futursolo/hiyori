@@ -31,11 +31,11 @@ __all__ = [
     "HttpsResolver",
 ]
 
-try:
+try:  # pragma: no cover
     from .async_ import AsyncResolver
 
     DefaultResolver: Type[BaseResolver] = AsyncResolver
     __all__.append("AsyncResolver")
 
-except ImportError:
+except ImportError:  # pragma: no cover
     DefaultResolver = SystemResolver

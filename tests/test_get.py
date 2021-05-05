@@ -18,7 +18,6 @@
 import asyncio
 import os
 
-from test_helper import MockServer, helper
 import helpers
 import pytest
 
@@ -46,38 +45,33 @@ class GetEchoProtocol(helpers.BaseMockProtocol):
         )
 
 
-class GetEchoServer(MockServer):
-    def connection_made(self, transport):
+class JsonResponseProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
 
-        transport.write(
-            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
-        )
-
-
-class JsonResponseServer(MockServer):
-    def connection_made(self, transport):
-        super().connection_made(transport)
+        assert isinstance(transport, asyncio.Transport)
 
         transport.write(
             b'HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n{"a": "b"}'
         )
 
 
-class AlwaysRedirectServer(MockServer):
-    def data_received(self, data):
+class AlwaysRedirectProtocol(helpers.BaseMockProtocol):
+    def data_received(self, data: bytes) -> None:
         super().data_received(data)
 
+        assert isinstance(self.transport, asyncio.Transport)
         self.transport.write(
             b"HTTP/1.1 302 Found\r\nLocation: /\r\n"
             b"Content-Length: 0\r\n\r\n"
         )
 
 
-class Redirect10TimesServer(MockServer):
-    def connection_made(self, transport):
+class Redirect10TimesProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
 
+        assert isinstance(transport, asyncio.Transport)
         for _ in range(0, 10):
             transport.write(
                 b"HTTP/1.1 302 Found\r\nLocation: /\r\n"
@@ -89,10 +83,11 @@ class Redirect10TimesServer(MockServer):
         )
 
 
-class RelativeRedirectServer(MockServer):
-    def connection_made(self, transport):
+class RelativeRedirectProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
 
+        assert isinstance(transport, asyncio.Transport)
         transport.write(
             b"HTTP/1.1 302 Found\r\nLocation: ../\r\n"
             b"Content-Length: 0\r\n\r\n"
@@ -103,35 +98,41 @@ class RelativeRedirectServer(MockServer):
         )
 
 
-class Http404Server(MockServer):
-    def connection_made(self, transport):
+class Http404Protocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
 
+        assert isinstance(transport, asyncio.Transport)
         transport.write(
             b"HTTP/1.1 404 Not Found\r\nContent-Length: 19\r\n\r\n"
             b"HTTP 404: Not Found"
         )
 
 
-class ConnectionClosedServer(MockServer):
-    def connection_made(self, transport):
+class ConnectionClosedProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
+
+        assert isinstance(transport, asyncio.Transport)
 
         transport.write(b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello,")
         transport.close()
 
 
-class UrandomServer(MockServer):
-    def connection_made(self, transport):
+class UrandomProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
+
+        assert isinstance(transport, asyncio.Transport)
 
         transport.write(os.urandom(128 * 1024))
 
 
-class MalformedServer(MockServer):
-    def connection_made(self, transport):
+class MalformedProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
 
+        assert isinstance(transport, asyncio.Transport)
         transport.write(
             b"HTTP/1.2 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
         )
@@ -154,7 +155,7 @@ async def test_simple(mocked_server: helpers.MockedServer) -> None:
     assert response.request.authority == f"localhost:{mocked_server.port}"
     assert not hasattr(response.request, "scheme")
     assert response.request.headers == {
-        "user-agent": helper.get_version_str(),
+        "user-agent": helpers.get_version_str(),
         "accept": "*/*",
         "host": f"localhost:{mocked_server.port}",
     }
@@ -193,7 +194,7 @@ async def test_simple_unix(
     assert response.request.authority == f"localhost:{mocked_unix_server.port}"
     assert not hasattr(response.request, "scheme")
     assert response.request.headers == {
-        "user-agent": helper.get_version_str(),
+        "user-agent": helpers.get_version_str(),
         "accept": "*/*",
         "host": f"localhost:{mocked_unix_server.port}",
     }
@@ -206,140 +207,149 @@ async def test_simple_unix(
     )
 
 
-class GetTestCase:
-    @helper.run_async_test(with_srv_cls=GetEchoServer)
-    async def test_simple(self):
-        response = await get("http://localhost:8000")
+@pytest.mark.asyncio
+async def test_json(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = JsonResponseProtocol
+    async with HttpClient() as client:
+        response = await client.get(f"http://localhost:{mocked_server.port}")
 
         assert response.status_code == 200
-        assert response.body == b"Hello, World!"
-        assert response.version == HttpVersion.V1_1
-        assert response.headers == {"content-length": "13"}
+        assert response.body.to_json() == {"a": "b"}
 
-        assert response.request.method == HttpRequestMethod.GET
-        assert response.request.version == HttpVersion.V1_1
-        assert response.request.uri == "/"
-        assert response.request.authority == "localhost:8000"
-        assert not hasattr(response.request, "scheme")
-        assert response.request.headers == {
-            "user-agent": helper.get_version_str(),
-            "accept": "*/*",
-            "host": "localhost:8000",
-        }
-
-        helper.assert_initial_bytes(
-            b"".join(helper.mock_srv.data_chunks),
+        mocked_server.select_proto().assert_initial(
             b"GET / HTTP/1.1",
             b"User-Agent: %(self_ver_bytes)s",
             b"Accept: */*",
-            b"Host: localhost:8000",
+            f"Host: localhost:{mocked_server.port}".encode(),
         )
 
-    @helper.run_async_test(with_srv_cls=JsonResponseServer)
-    async def test_json(self):
-        async with HttpClient() as client:
-            response = await client.get("http://localhost:8000")
 
-            assert response.status_code == 200
-            assert response.body.to_json() == {"a": "b"}
+@pytest.mark.asyncio
+async def test_path_args(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = GetEchoProtocol
 
-            helper.assert_initial_bytes(
-                b"".join(helper.mock_srv.data_chunks),
-                b"GET / HTTP/1.1",
-                b"User-Agent: %(self_ver_bytes)s",
-                b"Accept: */*",
-                b"Host: localhost:8000",
+    async with HttpClient() as client:
+        response = await client.get(
+            f"http://localhost:{mocked_server.port}/?a=b", path_args={"c": "d"}
+        )
+
+        assert response.status_code == 200
+        assert response.body == b"Hello, World!"
+
+        mocked_server.select_proto().assert_initial(
+            b"GET /?a=b&c=d HTTP/1.1",
+            b"User-Agent: %(self_ver_bytes)s",
+            b"Accept: */*",
+            f"Host: localhost:{mocked_server.port}".encode(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_default_no_redirect(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = AlwaysRedirectProtocol
+    async with HttpClient() as client:
+        response = await client.get(f"http://localhost:{mocked_server.port}/")
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "/"
+
+
+@pytest.mark.asyncio
+async def test_redirect_successful(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = Redirect10TimesProtocol
+    async with HttpClient() as client:
+        response = await client.get(
+            f"http://localhost:{mocked_server.port}/", follow_redirection=True
+        )
+
+        assert response.status_code == 200
+        assert response.body == b"Hello, World!"
+
+
+@pytest.mark.asyncio
+async def test_too_many_redirects(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = AlwaysRedirectProtocol
+    async with HttpClient() as client:
+        with pytest.raises(TooManyRedirects):
+            await client.get(
+                f"http://localhost:{mocked_server.port}/",
+                follow_redirection=True,
             )
 
-    @helper.run_async_test(with_srv_cls=GetEchoServer)
-    async def test_path_args(self):
-        async with HttpClient() as client:
-            response = await client.get(
-                "http://localhost:8000/?a=b", path_args={"c": "d"}
+
+@pytest.mark.asyncio
+async def test_prevent_relative_redirect(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = RelativeRedirectProtocol
+    async with HttpClient() as client:
+        with pytest.raises(FailedRedirection):
+            await client.get(
+                f"http://localhost:{mocked_server.port}/",
+                follow_redirection=True,
             )
 
-            assert response.status_code == 200
-            assert response.body == b"Hello, World!"
 
-            helper.assert_initial_bytes(
-                b"".join(helper.mock_srv.data_chunks),
-                b"GET /?a=b&c=d HTTP/1.1",
-                b"User-Agent: %(self_ver_bytes)s",
-                b"Accept: */*",
-                b"Host: localhost:8000",
-            )
+@pytest.mark.asyncio
+async def test_response_404(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = Http404Protocol
+    async with HttpClient() as client:
+        with pytest.raises(HttpError) as exc_info:
+            await client.get(f"http://localhost:{mocked_server.port}/")
 
-    @helper.run_async_test(with_srv_cls=AlwaysRedirectServer)
-    async def test_default_no_redirect(self):
-        async with HttpClient() as client:
-            response = await client.get("http://localhost:8000/")
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.status_description == "Not Found"
 
-            assert response.status_code == 302
-            assert response.headers["location"] == "/"
 
-    @helper.run_async_test(with_srv_cls=Redirect10TimesServer)
-    async def test_redirect_successful(self):
-        async with HttpClient() as client:
-            response = await client.get(
-                "http://localhost:8000/", follow_redirection=True
-            )
+@pytest.mark.asyncio
+async def test_response_404_no_raise(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = Http404Protocol
+    async with HttpClient(raise_error=False) as client:
+        response = await client.get(f"http://localhost:{mocked_server.port}/")
 
-            assert response.status_code == 200
-            assert response.body == b"Hello, World!"
+        assert response.status_code == 404
+        assert response.body == b"HTTP 404: Not Found"
 
-    @helper.run_async_test(with_srv_cls=AlwaysRedirectServer)
-    async def test_too_many_redirects(self):
-        async with HttpClient() as client:
-            with pytest.raises(TooManyRedirects):
-                await client.get(
-                    "http://localhost:8000/", follow_redirection=True
-                )
 
-    @helper.run_async_test(with_srv_cls=RelativeRedirectServer)
-    async def test_prevent_relative_redirect(self):
-        async with HttpClient() as client:
-            with pytest.raises(FailedRedirection):
-                await client.get(
-                    "http://localhost:8000/", follow_redirection=True
-                )
+@pytest.mark.asyncio
+async def test_connection_closed(
+    mocked_server: helpers.MockedServer,
+) -> None:
+    mocked_server.mock_proto_cls = ConnectionClosedProtocol
+    async with HttpClient() as client:
+        with pytest.raises(ConnectionClosed):
+            await client.get(f"http://localhost:{mocked_server.port}/")
 
-    @helper.run_async_test(with_srv_cls=Http404Server)
-    async def test_response_404(self):
-        async with HttpClient() as client:
-            with pytest.raises(HttpError) as exc_info:
-                await client.get("http://localhost:8000/")
 
-            assert exc_info.value.status_code == 404
-            assert exc_info.value.status_description == "Not Found"
+@pytest.mark.asyncio
+async def test_too_large(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = GetEchoProtocol
+    async with HttpClient(max_body_size=12) as client:
+        with pytest.raises(ResponseEntityTooLarge):
+            await client.get(f"http://localhost:{mocked_server.port}/")
 
-    @helper.run_async_test(with_srv_cls=Http404Server)
-    async def test_response_404_no_raise(self):
-        async with HttpClient(raise_error=False) as client:
-            response = await client.get("http://localhost:8000/")
 
-            assert response.status_code == 404
-            assert response.body == b"HTTP 404: Not Found"
+@pytest.mark.asyncio
+async def test_too_large_2(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = UrandomProtocol
+    async with HttpClient(max_body_size=12) as client:
+        with pytest.raises(ResponseEntityTooLarge):
+            await client.get(f"http://localhost:{mocked_server.port}/")
 
-    @helper.run_async_test(with_srv_cls=ConnectionClosedServer)
-    async def test_connection_closed(self):
-        async with HttpClient() as client:
-            with pytest.raises(ConnectionClosed):
-                await client.get("http://localhost:8000/")
 
-    @helper.run_async_test(with_srv_cls=GetEchoServer)
-    async def test_too_large(self):
-        async with HttpClient(max_body_size=12) as client:
-            with pytest.raises(ResponseEntityTooLarge):
-                await client.get("http://localhost:8000")
-
-    @helper.run_async_test(with_srv_cls=UrandomServer)
-    async def test_too_large_2(self):
-        async with HttpClient(max_body_size=12) as client:
-            with pytest.raises(ResponseEntityTooLarge):
-                await client.get("http://localhost:8000")
-
-    @helper.run_async_test(with_srv_cls=MalformedServer)
-    async def test_malformed_data(self):
-        async with HttpClient(max_body_size=12) as client:
-            with pytest.raises(BadResponse):
-                await client.get("http://localhost:8000")
+@pytest.mark.asyncio
+async def test_malformed_data(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = MalformedProtocol
+    async with HttpClient(max_body_size=12) as client:
+        with pytest.raises(BadResponse):
+            await client.get(f"http://localhost:{mocked_server.port}/")
