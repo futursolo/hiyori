@@ -35,6 +35,9 @@ def update_resolver() -> None:
     if desired_resolver == "SYSTEM":
         hiyori.resolvers.DefaultResolver = hiyori.resolvers.SystemResolver
 
+    elif desired_resolver == "HTTPS":
+        hiyori.resolvers.DefaultResolver = hiyori.resolvers.HttpsResolver
+
     elif desired_resolver == "ASYNC":  # noqa: SIM106
         hiyori.resolvers.DefaultResolver = hiyori.resolvers.AsyncResolver
 

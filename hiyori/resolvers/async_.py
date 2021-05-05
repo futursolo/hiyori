@@ -21,8 +21,8 @@ import contextlib
 import ipaddress
 import pathlib
 
-from .. import exceptions
-from . import base, hosts
+from .. import exceptions, resolvers
+from . import base
 
 __all__ = []
 
@@ -57,8 +57,8 @@ try:
 
             if respect_hosts_file:
                 self._hosts_resolver: Optional[
-                    hosts.HostsResolver
-                ] = hosts.HostsResolver(
+                    resolvers.HostsResolver
+                ] = resolvers.HostsResolver(
                     min_ttl=min_ttl, respect_remote_ttl=respect_remote_ttl
                 )
 

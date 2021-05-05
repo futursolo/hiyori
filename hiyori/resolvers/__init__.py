@@ -19,6 +19,7 @@ from typing import Type
 
 from .base import BaseResolver, ResolvedResult
 from .hosts import HostsResolver
+from .https import HttpsResolver
 from .system import SystemResolver
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "SystemResolver",
     "HostsResolver",
     "DefaultResolver",
+    "HttpsResolver",
 ]
 
 try:
