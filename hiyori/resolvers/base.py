@@ -26,8 +26,7 @@ import time
 from .. import exceptions
 
 _RECORD = Union[
-    Tuple[ipaddress.IPv4Address, int],
-    Tuple[ipaddress.IPv6Address, int],
+    Tuple[Union[ipaddress.IPv6Address, ipaddress.IPv4Address], int],
     pathlib.Path,
 ]
 
@@ -245,7 +244,9 @@ class BaseResolver(abc.ABC):
         return fresh_result
 
     @abc.abstractmethod
-    async def lookup_now(self, host: str, port: int) -> ResolvedResult:
+    async def lookup_now(
+        self, host: str, port: int
+    ) -> ResolvedResult:  # pragma: no cover
         """
         Look up the record without caching.
 

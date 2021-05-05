@@ -100,7 +100,7 @@ class HostsResolver(base.BaseResolver):
             return base.ResolvedResult(
                 host=host,
                 port=port,
-                results=set(results),  # type: ignore
+                results=set(results),
                 ttl=self._min_ttl,
             )
 

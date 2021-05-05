@@ -12,7 +12,8 @@ jobs:
         os: [macOS, Ubuntu]
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
@@ -38,13 +39,13 @@ jobs:
 
       - name: Pytest
         run: |
-          poetry run coverage run --source=hiyori -m pytest
+          poetry run pytest --cov=hiyori
 
       - name: Upload Coverage
         run: coveralls
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_FLAG_NAME: ${{ matrix.os }} with Python ${{ matrix.python-version }}
+          COVERALLS_FLAG_NAME: Testing on ${{ matrix.os }} with Python ${{ matrix.python-version }}
           COVERALLS_PARALLEL: true
           COVERALLS_SERVICE_NAME: github
 
@@ -72,14 +73,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: 3.6
 
       - name: Install dependencies
         run: |
@@ -103,14 +105,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: 3.6
 
       - name: Install dependencies
         run: |
