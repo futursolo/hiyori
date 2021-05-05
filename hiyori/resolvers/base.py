@@ -15,14 +15,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Dict, Tuple, Union, Optional, Callable, TypeVar, Set
-
+from typing import Callable, Dict, Optional, Set, Tuple, TypeVar, Union
 import abc
-import time
+import asyncio
 import ipaddress
 import pathlib
-import asyncio
 import ssl
+import time
 
 from .. import exceptions
 

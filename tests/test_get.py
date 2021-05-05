@@ -15,23 +15,23 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
+
+from test_helper import MockServer, helper
+import pytest
+
 from hiyori import (
+    BadResponse,
+    ConnectionClosed,
+    FailedRedirection,
     HttpClient,
+    HttpError,
     HttpRequestMethod,
     HttpVersion,
-    TooManyRedirects,
-    FailedRedirection,
-    HttpError,
-    ConnectionClosed,
-    get,
     ResponseEntityTooLarge,
-    BadResponse,
+    TooManyRedirects,
+    get,
 )
-
-from test_helper import helper, MockServer
-
-import pytest
-import os
 
 
 class GetEchoServer(MockServer):

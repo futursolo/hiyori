@@ -15,17 +15,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Dict, Union, List
-
-import time
+from typing import Dict, List, Union
 import ipaddress
 import os
 import pathlib
 import platform
+import time
 
-from . import base
 from .. import exceptions
-
+from . import base
 
 if platform.system() == "Windows":
     _SYSTEM_DEFAULT_HOST_PATH = (

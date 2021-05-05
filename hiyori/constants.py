@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from magichttp import HttpVersion, HttpStatusCode, HttpRequestMethod
+from magichttp import HttpRequestMethod, HttpStatusCode, HttpVersion
 
 __all__ = ["HttpVersion", "HttpStatusCode", "HttpRequestMethod", "HttpScheme"]
 

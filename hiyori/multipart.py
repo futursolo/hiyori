@@ -15,15 +15,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Dict, Union, BinaryIO, List, Optional, Mapping
-
-from . import bodies
-
-import uuid
+from typing import BinaryIO, Dict, List, Mapping, Optional, Union
+import asyncio
+import contextlib
 import io
 import mimetypes
+import uuid
+
 import magicdict
-import asyncio
+
+from . import bodies
 
 __all__ = ["File", "MultipartRequestBody"]
 
@@ -85,11 +86,8 @@ class _FileField(bodies.BaseRequestBody):
 
     async def read(self, n: int) -> bytes:
         async with self._lock:
-            try:
+            with contextlib.suppress(EOFError):
                 return await self._prefix.read(n)
-
-            except EOFError:
-                pass
 
             part = self._fp.read(n)
 

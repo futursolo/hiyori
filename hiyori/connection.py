@@ -16,15 +16,12 @@
 #   limitations under the License.
 
 from typing import NamedTuple, Optional
-
-from . import messages
-from . import exceptions
-from . import constants
-from . import resolvers
-
 import asyncio
-import magichttp
 import ssl
+
+import magichttp
+
+from . import constants, exceptions, messages, resolvers
 
 
 class HttpConnectionId(NamedTuple):

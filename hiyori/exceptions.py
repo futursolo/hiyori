@@ -16,12 +16,11 @@
 #   limitations under the License.
 
 from typing import Any
-
 import typing
 
 if typing.TYPE_CHECKING:
-    from . import messages  # noqa: F401
     from . import constants  # noqa: F401
+    from . import messages  # noqa: F401
 
 __all__ = [
     "BaseHiyoriException",

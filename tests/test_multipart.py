@@ -15,12 +15,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori import post
-from hiyori.multipart import MultipartRequestBody, File
-
-from test_helper import helper, MockServer
-
 import io
+
+from test_helper import MockServer, helper
+
+from hiyori import post
+from hiyori.multipart import File, MultipartRequestBody
 
 
 class MultipartEchoServer(MockServer):

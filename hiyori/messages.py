@@ -15,17 +15,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Optional, Mapping, Union
-
-from . import constants
-from . import _version
-from . import bodies
-from . import connection
-
+from typing import Mapping, Optional, Union
+import contextlib
 import urllib.parse
+import warnings
+
 import magicdict
 import magichttp
-import warnings
+
+from . import _version, bodies, connection, constants
 
 __all__ = ["PendingRequest", "Request", "Response"]
 
@@ -174,17 +172,11 @@ class Request:
             f"uri={self.uri!r}",
         ]
 
-        try:
+        with contextlib.suppress(AttributeError):
             parts.append(f"authority={self.authority!r}")
 
-        except AttributeError:
-            pass
-
-        try:
+        with contextlib.suppress(AttributeError):
             parts.append(f"scheme={self.scheme!r}")
-
-        except AttributeError:
-            pass
 
         parts.append(f"headers={self.headers!r}")
 

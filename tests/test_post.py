@@ -15,11 +15,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori import HttpClient, HttpRequestMethod, HttpVersion, post
-
-from test_helper import helper, MockServer
-
+from test_helper import MockServer, helper
 import pytest
+
+from hiyori import HttpClient, HttpRequestMethod, HttpVersion, post
 
 
 class PostEchoServer(MockServer):

@@ -15,16 +15,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from hiyori.resolvers import HostsResolver
-import hiyori
-
-import pathlib
-import ipaddress
-import pytest
 import asyncio
-
+import ipaddress
+import pathlib
 
 from test_helper import helper
+import pytest
+
+from hiyori.resolvers import HostsResolver
+import hiyori
 
 
 class HostsResolverTestCase:

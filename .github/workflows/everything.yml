@@ -23,22 +23,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install wheel
-          python -m pip install --upgrade pip setuptools coveralls
-          python -m pip install .[test]
-          python -m pip install --editable .
+          pip install wheel
+          pip install --upgrade poetry pip coveralls
+          poetry install
 
       - name: Mypy
         run: |
-          mypy --python-version 3.9 --strict --show-traceback --ignore-missing-imports --show-error-context --implicit-reexport --pretty -p hiyori
+          poetry run mypy --pretty -p hiyori
 
       - name: Lint with flake8
         run: |
-          flake8 .
+          poetry run flake8 .
 
       - name: Pytest
         run: |
-          coverage run --source=hiyori setup.py test
+          poetry run coverage run --source=hiyori -m pytest
 
       - name: Upload Coverage
         run: coveralls
@@ -52,8 +51,12 @@ jobs:
     name: Finish Coveralls
     needs: testing
     runs-on: ubuntu-latest
-    container: python:3-slim
     steps:
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
       - name: All Testing Finished
         run: |
           pip3 install --upgrade coveralls
@@ -79,17 +82,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install --editable .
+          pip install wheel
+          pip install --upgrade pip
+          pip install --upgrade poetry
+          poetry install
 
       - name: Package Project
-        run: python setup.py sdist bdist_wheel
+        run: poetry build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.4.2
-        with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          poetry publish
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
 
   upload_test_pypi:
     name: Upload to Test PyPI
@@ -108,15 +113,17 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install --editable .
+          pip install wheel
+          pip install --upgrade pip
+          pip install --upgrade poetry
+          poetry install
 
       - name: Package Project
-        run: python setup.py sdist bdist_wheel
+        run: poetry build
 
       - name: Publish to Test PyPI
-        uses: pypa/gh-action-pypi-publish@v1.4.2
-        with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
+        run: |
+          poetry config repositories.test https://test.pypi.org/legacy/
+          poetry publish -r test
+        env:
+          POETRY_PYPI_TOKEN_TEST: ${{ secrets.TEST_PYPI_TOKEN }}

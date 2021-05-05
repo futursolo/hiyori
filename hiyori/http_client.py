@@ -16,30 +16,32 @@
 #   limitations under the License.
 
 from typing import (
-    MutableMapping,
-    Optional,
-    Mapping,
-    Union,
-    Dict,
     Any,
     BinaryIO,
+    Dict,
     List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Union,
 )
-
-from . import messages
-from . import exceptions
-from . import constants
-from . import connection
-from . import bodies
-from . import multipart
-from . import resolvers
-
-import ssl
-import collections
 import asyncio
-import urllib.parse
-import magicdict
+import collections
 import re
+import ssl
+import urllib.parse
+
+import magicdict
+
+from . import (
+    bodies,
+    connection,
+    constants,
+    exceptions,
+    messages,
+    multipart,
+    resolvers,
+)
 
 __all__ = [
     "HttpClient",
@@ -163,7 +165,7 @@ class HttpClient:
     async def _get_conn(
         self, __id: connection.HttpConnectionId, timeout: int
     ) -> connection.HttpConnection:
-        if __id in self._conns.keys():
+        if __id in self._conns:
             conn = self._conns.pop(__id)
 
             if not conn.closing():

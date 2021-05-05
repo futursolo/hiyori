@@ -16,8 +16,10 @@
 #   limitations under the License.
 
 import asyncio
-import hiyori
+
 import magichttp
+
+import hiyori
 
 
 class _SkeletonServer(asyncio.Protocol):
@@ -172,7 +174,9 @@ class _TestHelper:
         assert len(buf_parts) == len(header_lines)
 
         for line in header_lines:
-            line = line % {b"self_ver_bytes": self.get_version_bytes()}
+            line = line % {  # noqa: S001
+                b"self_ver_bytes": self.get_version_bytes()
+            }
             assert line in buf_parts
 
     def __del__(self):

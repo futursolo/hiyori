@@ -15,8 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import Union, Dict, List, Any, Mapping
-
+from typing import Any, Dict, List, Mapping, Union
 import abc
 import io
 import json

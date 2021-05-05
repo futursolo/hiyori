@@ -16,9 +16,10 @@
 #   limitations under the License.
 
 from typing import Type
-from .base import ResolvedResult, BaseResolver
-from .system import SystemResolver
+
+from .base import BaseResolver, ResolvedResult
 from .hosts import HostsResolver
+from .system import SystemResolver
 
 __all__ = [
     "ResolvedResult",
