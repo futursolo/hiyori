@@ -24,10 +24,12 @@ import pytest
 from hiyori.resolvers import HostsResolver
 import hiyori
 
+_TEST_HOST_PATH = pathlib.Path(__file__).parent / "files" / "hosts"
+
 
 @pytest.mark.asyncio
 async def test_simple() -> None:
-    resolv = HostsResolver(host_path=pathlib.Path(__file__).parent / "hosts")
+    resolv = HostsResolver(host_path=_TEST_HOST_PATH)
 
     result = await resolv.lookup("localhost", 9999)
 
@@ -43,9 +45,7 @@ async def test_simple() -> None:
 
 @pytest.mark.asyncio
 async def test_cache() -> None:
-    resolv = HostsResolver(
-        host_path=pathlib.Path(__file__).parent / "hosts", min_ttl=1
-    )
+    resolv = HostsResolver(host_path=_TEST_HOST_PATH, min_ttl=1)
 
     result = await resolv.lookup("localhost", 9999)
 
@@ -69,7 +69,7 @@ async def test_cache() -> None:
 
 @pytest.mark.asyncio
 async def test_override() -> None:
-    resolv = HostsResolver(host_path=pathlib.Path(__file__).parent / "hosts")
+    resolv = HostsResolver(host_path=_TEST_HOST_PATH)
 
     with pytest.raises(hiyori.UnresolvableHost):
         await resolv.lookup("something.that-is.unresolvable", 9999)
@@ -138,7 +138,7 @@ async def test_override() -> None:
 
 @pytest.mark.asyncio
 async def test_not_exist() -> None:
-    resolv = HostsResolver(host_path=pathlib.Path(__file__).parent / "hosts")
+    resolv = HostsResolver(host_path=_TEST_HOST_PATH)
 
     with pytest.raises(hiyori.UnresolvableHost):
         await resolv.lookup("something.that-does.not-exist", 9999)

@@ -15,6 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typing import List, Optional, Type, Union
 import asyncio
 
 import magichttp
@@ -23,7 +24,9 @@ import hiyori
 
 
 class _SkeletonServer(asyncio.Protocol):
-    def connection_made(self, transport):
+    _mock_srv: Optional[asyncio.Protocol]
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         print("Connection made.")
 
         if helper.mock_srv_cls is None:
@@ -31,60 +34,72 @@ class _SkeletonServer(asyncio.Protocol):
 
             return
 
+        assert helper.mock_srv_cls is not None
         self._mock_srv = helper.mock_srv_cls()
 
         self._mock_srv.connection_made(transport)
 
-    def data_received(self, data):
+    def data_received(self, data: bytes) -> None:
         print(f"Data received: {data!r}.")
         helper.mock_srv = self._mock_srv
 
+        assert self._mock_srv is not None
         self._mock_srv.data_received(data)
 
-    def eof_received(self):
+    def eof_received(self) -> Optional[bool]:
         print("Eof received.")
 
-        return self._mock_srv.eof_received()
+        return self._mock_srv.eof_received() if self._mock_srv else None
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc: Optional[Exception]) -> None:
         print("Connection lost.")
         if exc:
             print(exc)
 
+        assert self._mock_srv is not None
         self._mock_srv.connection_lost(exc)
 
 
 class MockServer(asyncio.Protocol):
-    def __init__(self):
-        self.transport = None
-        self.data_chunks = []
+    def __init__(self) -> None:
+        self.transport: Optional[asyncio.BaseTransport] = None
+        self.data_chunks: List[bytes] = []
         self.eof = False
-        self.exc = None
+        self.exc: Optional[Exception] = None
         self.conn_lost = False
 
-    def connection_made(self, transport):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         self.transport = transport
 
-    def data_received(self, data):
+    def data_received(self, data: bytes) -> None:
         self.data_chunks.append(data)
 
-    def eof_received(self):
+    def eof_received(self) -> Optional[bool]:
         self.eof = True
         return True
 
-    def connection_lost(self, exc):
+    def connection_lost(self, exc: Optional[Exception]) -> None:
         self.exc = exc
         self.conn_lost = True
 
 
+class TestHelper:
+    """
+    A test helper that controls the servers.
+    """
+
+    def __init__(self) -> None:
+        self._srv = None
+
+
 class _TestHelper:
-    def __init__(self):
-        self.loop.set_debug(True)
+    """
+    Legacy Test Helper
+    """
 
-        self._tsks = set()
-
-        self.mock_srv = None
-        self.mock_srv_cls = None
+    def __init__(self) -> None:
+        self.mock_srv: Optional[asyncio.Protocol] = None
+        self.mock_srv_cls: Optional[Type[asyncio.Protocol]] = None
 
         self._srv = None
 
@@ -118,22 +133,6 @@ class _TestHelper:
                         self.mock_srv.transport.close()
                         self.mock_srv = None
 
-                    self._tsks, tsks = set(), self._tsks
-
-                    for tsk in tsks:
-                        try:
-                            if not tsk.done():
-                                tsk.cancel()
-
-                            await tsk
-
-                        except asyncio.CancelledError:
-                            continue
-
-                        except BaseException as e:
-                            if not exc:
-                                exc = e
-
                 finally:
                     self._srv.close()
                     await self._srv.wait_closed()
@@ -160,20 +159,15 @@ class _TestHelper:
 
         return decorator
 
-    def create_task(self, coro):
-        tsk = self.loop.create_task(coro)
-
-        self._tsks.add(tsk)
-
-        return tsk
-
-    def get_version_str(self):
+    def get_version_str(self) -> str:
         return f"hiyori/{hiyori.__version__} magichttp/{magichttp.__version__}"
 
-    def get_version_bytes(self):
+    def get_version_bytes(self) -> bytes:
         return self.get_version_str().encode()
 
-    def assert_initial_bytes(self, buf, first_line, *header_lines):
+    def assert_initial_bytes(
+        self, buf: Union[bytes, bytearray], first_line: bytes, *header_lines
+    ) -> None:
         buf_initial = buf.split(b"\r\n\r\n")[0]
         buf_parts = buf_initial.split(b"\r\n")
 

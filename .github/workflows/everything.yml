@@ -41,6 +41,20 @@ jobs:
         run: |
           poetry run pytest --cov=hiyori
 
+      - name: Pytest with AsyncResolver
+        run: |
+          poetry run pytest --cov=hiyori --cov-append
+
+        env:
+          HIYORI_RESOLVER: "ASYNC"
+
+      - name: Pytest with SystemResolver
+        run: |
+          poetry run pytest --cov=hiyori --cov-append
+
+        env:
+          HIYORI_RESOLVER: "SYSTEM"
+
       - name: Upload Coverage
         run: coveralls
         env:
