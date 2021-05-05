@@ -79,8 +79,6 @@ class MockServer(asyncio.Protocol):
 
 class _TestHelper:
     def __init__(self):
-        self.loop = asyncio.get_event_loop()
-
         self.loop.set_debug(True)
 
         self._tsks = set()
@@ -88,11 +86,13 @@ class _TestHelper:
         self.mock_srv = None
         self.mock_srv_cls = None
 
-        self._srv = self.loop.run_until_complete(
-            self.loop.create_server(
-                _SkeletonServer, host="localhost", port=8000
-            )
-        )
+        self._srv = None
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        loop = asyncio.get_event_loop()
+        loop.set_debug(True)
+        return loop
 
     def run_async_test(self, *args, with_srv_cls=None):
         def decorator(coro_fn):
@@ -100,34 +100,43 @@ class _TestHelper:
                 self.mock_srv_cls = with_srv_cls
 
                 exc = None
+                self._srv = await self.loop.create_server(
+                    _SkeletonServer, host="localhost", port=8000
+                )
 
                 try:
-                    await asyncio.wait_for(
-                        coro_fn(_self, *args, **kwargs), timeout=5
-                    )
 
-                except Exception as e:
-                    exc = e
-
-                if self.mock_srv:
-                    self.mock_srv.transport.close()
-                    self.mock_srv = None
-
-                self._tsks, tsks = set(), self._tsks
-
-                for tsk in tsks:
                     try:
-                        if not tsk.done():
-                            tsk.cancel()
+                        await asyncio.wait_for(
+                            coro_fn(_self, *args, **kwargs), timeout=5
+                        )
 
-                        await tsk
+                    except Exception as e:
+                        exc = e
 
-                    except asyncio.CancelledError:
-                        continue
+                    if self.mock_srv:
+                        self.mock_srv.transport.close()
+                        self.mock_srv = None
 
-                    except BaseException as e:
-                        if not exc:
-                            exc = e
+                    self._tsks, tsks = set(), self._tsks
+
+                    for tsk in tsks:
+                        try:
+                            if not tsk.done():
+                                tsk.cancel()
+
+                            await tsk
+
+                        except asyncio.CancelledError:
+                            continue
+
+                        except BaseException as e:
+                            if not exc:
+                                exc = e
+
+                finally:
+                    self._srv.close()
+                    await self._srv.wait_closed()
 
                 if exc:
                     raise exc
@@ -178,10 +187,6 @@ class _TestHelper:
                 b"self_ver_bytes": self.get_version_bytes()
             }
             assert line in buf_parts
-
-    def __del__(self):
-        self._srv.close()
-        self.loop.run_until_complete(self._srv.wait_closed())
 
 
 helper = _TestHelper()

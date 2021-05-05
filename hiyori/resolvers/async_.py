@@ -15,9 +15,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typing import List, Optional
+from typing import List, Optional, Set, Tuple, Union
+import asyncio
+import contextlib
+import ipaddress
+import pathlib
 
-from . import base
+from .. import exceptions
+from . import base, hosts
 
 __all__ = []
 
@@ -50,7 +55,15 @@ try:
                 min_ttl=min_ttl, respect_remote_ttl=respect_remote_ttl
             )
 
-            self._respect_hosts_file = respect_hosts_file
+            if respect_hosts_file:
+                self._hosts_resolver: Optional[
+                    hosts.HostsResolver
+                ] = hosts.HostsResolver(
+                    min_ttl=min_ttl, respect_remote_ttl=respect_remote_ttl
+                )
+
+            else:
+                self._hosts_resolver = None
 
             self._dns_servers = dns_servers
 
@@ -59,7 +72,60 @@ try:
         async def lookup_now(
             self, host: str, port: int
         ) -> base.ResolvedResult:
-            raise NotImplementedError
+            if self._hosts_resolver is not None:
+                with contextlib.suppress(exceptions.UnresolvableHost):
+                    return await self._hosts_resolver.lookup(host, port)
+
+            results: Set[
+                Union[
+                    Tuple[
+                        Union[ipaddress.IPv4Address, ipaddress.IPv6Address],
+                        int,
+                    ],
+                    pathlib.Path,
+                ]
+            ] = set()
+
+            ttl: Optional[int] = None
+
+            done, _ = await asyncio.wait(
+                [
+                    self._resolver.query(host, "A"),
+                    self._resolver.query(host, "AAAA"),
+                ]
+            )
+
+            for tsk in done:
+                with contextlib.suppress(aiodns.error.DNSError):
+                    for result in tsk.result():
+                        with contextlib.suppress(ValueError):
+                            ip = ipaddress.ip_address(result.host)
+
+                            results.add((ip, port))
+
+                            if ttl is None or ttl > result.ttl:
+                                ttl = result.ttl
+
+            if ttl is None or ttl < self._min_ttl:
+                ttl = self._min_ttl
+
+            if not results:
+                try:
+                    for tsk in done:
+                        tsk.result()
+
+                    raise RuntimeError(
+                        "This shouldn't happen. Please file an issue."
+                    )
+
+                except (RuntimeError, aiodns.error.DNSError) as e:
+                    raise exceptions.UnresolvableHost(
+                        f"Failed to resolve {host}:{port}."
+                    ) from e
+
+            return base.ResolvedResult(
+                host=host, port=port, results=results, ttl=ttl
+            )
 
     __all__.append("AsyncResolver")
 

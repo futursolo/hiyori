@@ -21,6 +21,8 @@ classifiers=[
   "Programming Language :: Python :: Implementation :: CPython",
 ]
 
+include=["hiyori/py.typed"]
+
 [tool.poetry.dependencies]
 python = "^3.6.1"
 importlib-metadata = { version = "^4.0.1", python = "<=3.7" }
@@ -31,6 +33,9 @@ magichttp = "^1.1.1"
 # Dictionary
 magicdict = "^1.0.6"
 coverage = "^5.5"
+
+# DNS Resolution
+aiodns = { version = "^2.0.0", optional = true }
 
 [tool.poetry.dev-dependencies]
 # Testing
@@ -79,7 +84,8 @@ flake8-simplify = "^0.14.0"
 # Dynamic Versioning
 poetry-dynamic-versioning = "^0.12.6"
 
-# Code Coverage
+[tool.poetry.extras]
+aiodns = ["aiodns"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
