@@ -18,8 +18,10 @@
 from typing import List, Optional, Type, Union
 import asyncio
 import contextlib
+import pathlib
 import socket
 import traceback
+import uuid
 
 import magichttp
 
@@ -137,6 +139,40 @@ class MockedServer:
 
         self._srv = await loop.create_server(
             lambda: _SkeletonProtocol(self), host="localhost", port=self.port
+        )
+
+        return self
+
+    async def __aexit__(self, exc: Optional[Exception] = None) -> None:
+        if self._srv:
+            self._srv.close()
+            await self._srv.wait_closed()
+
+    def select_proto(self) -> BaseMockProtocol:
+        """Selects the first non-empty protocol."""
+
+        for proto in self.mock_protos:
+            if b"".join(proto.data_chunks):
+                return proto
+
+        raise RuntimeError("There's no available protocol.")
+
+
+class MockedUnixServer(MockedServer):
+    """
+    Same as MockedServer but using a unix socket.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.path = pathlib.Path("/tmp") / f"{str(uuid.uuid4())}.sock"
+
+    async def __aenter__(self) -> "MockedUnixServer":
+        loop = asyncio.get_event_loop()
+
+        self._srv = await loop.create_unix_server(
+            lambda: _SkeletonProtocol(self), str(self.path)
         )
 
         return self

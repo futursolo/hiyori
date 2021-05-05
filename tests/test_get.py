@@ -167,6 +167,45 @@ async def test_simple(mocked_server: helpers.MockedServer) -> None:
     )
 
 
+@pytest.mark.asyncio
+async def test_simple_unix(
+    mocked_unix_server: helpers.MockedUnixServer,
+) -> None:
+    mocked_unix_server.mock_proto_cls = GetEchoProtocol
+
+    client = HttpClient()
+    client.resolver.override(
+        "localhost",
+        mocked_unix_server.port,
+        resolve_to=mocked_unix_server.path,
+    )
+
+    response = await client.get(f"http://localhost:{mocked_unix_server.port}")
+
+    assert response.status_code == 200
+    assert response.body == b"Hello, World!"
+    assert response.version == HttpVersion.V1_1
+    assert response.headers == {"content-length": "13"}
+
+    assert response.request.method == HttpRequestMethod.GET
+    assert response.request.version == HttpVersion.V1_1
+    assert response.request.uri == "/"
+    assert response.request.authority == f"localhost:{mocked_unix_server.port}"
+    assert not hasattr(response.request, "scheme")
+    assert response.request.headers == {
+        "user-agent": helper.get_version_str(),
+        "accept": "*/*",
+        "host": f"localhost:{mocked_unix_server.port}",
+    }
+
+    mocked_unix_server.select_proto().assert_initial(
+        b"GET / HTTP/1.1",
+        b"User-Agent: %(self_ver_bytes)s",
+        b"Accept: */*",
+        f"Host: localhost:{mocked_unix_server.port}".encode(),
+    )
+
+
 class GetTestCase:
     @helper.run_async_test(with_srv_cls=GetEchoServer)
     async def test_simple(self):

@@ -73,3 +73,21 @@ def mocked_server(
     yield srv
 
     event_loop.run_until_complete(close_mocked_server(srv))
+
+
+@pytest.fixture
+def mocked_unix_server(
+    event_loop: asyncio.AbstractEventLoop,
+) -> Generator[helpers.MockedUnixServer, None, None]:
+    async def create_mocked_server() -> helpers.MockedUnixServer:
+        srv = helpers.MockedUnixServer()
+        return await srv.__aenter__()
+
+    async def close_mocked_server(srv: helpers.MockedUnixServer) -> None:
+        await srv.__aexit__()
+
+    srv = event_loop.run_until_complete(create_mocked_server())
+
+    yield srv
+
+    event_loop.run_until_complete(close_mocked_server(srv))
