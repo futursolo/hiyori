@@ -1,0 +1,120 @@
+name: "Testing & Packaging"
+on: [push, pull_request]
+
+jobs:
+  testing:
+    name: Testing on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+        os: [macOS, Ubuntu, Windows]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install wheel
+          python -m pip install --upgrade pip setuptools coveralls
+          python -m pip install .[test]
+          python -m pip install --editable .
+
+      - name: Mypy
+        run: |
+          mypy --python-version ${{ matrix.python-version }} --strict --show-traceback --ignore-missing-imports --show-error-context --implicit-reexport --pretty -p hiyori
+
+      - name: Lint with flake8
+        run: |
+          flake8 .
+
+      - name: Pytest
+        run: |
+          coverage run --source=hiyori setup.py test
+
+      - name: Upload Coverage
+        run: coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_FLAG_NAME: ${{ matrix.os }} with Python ${{ matrix.python-version }}
+          COVERALLS_PARALLEL: true
+
+  coveralls:
+    name: Finish Coveralls
+    needs: testing
+    runs-on: ubuntu-latest
+    container: python:3-slim
+    steps:
+    - name: All Testing Finished
+      run: |
+        pip3 install --upgrade coveralls
+        coveralls --finish
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload_pypi:
+    name: Upload to PyPI
+    needs: testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --editable .
+
+      - name: Package Project
+        run: python setup.py sdist bdist_wheel
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.4.2
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
+
+  upload_test_pypi:
+    name: Upload to Test PyPI
+    needs: testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --editable .
+
+      - name: Package Project
+        run: python setup.py sdist bdist_wheel
+
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@v1.4.2
+        with:
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
