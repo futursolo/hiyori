@@ -15,9 +15,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import asyncio
 import os
 
 from test_helper import MockServer, helper
+import helpers
 import pytest
 
 from hiyori import (
@@ -32,6 +34,16 @@ from hiyori import (
     TooManyRedirects,
     get,
 )
+
+
+class GetEchoProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        super().connection_made(transport)
+
+        assert isinstance(transport, asyncio.Transport)
+        transport.write(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
+        )
 
 
 class GetEchoServer(MockServer):
@@ -123,6 +135,36 @@ class MalformedServer(MockServer):
         transport.write(
             b"HTTP/1.2 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
         )
+
+
+@pytest.mark.asyncio
+async def test_simple(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = GetEchoProtocol
+
+    response = await get(f"http://localhost:{mocked_server.port}")
+
+    assert response.status_code == 200
+    assert response.body == b"Hello, World!"
+    assert response.version == HttpVersion.V1_1
+    assert response.headers == {"content-length": "13"}
+
+    assert response.request.method == HttpRequestMethod.GET
+    assert response.request.version == HttpVersion.V1_1
+    assert response.request.uri == "/"
+    assert response.request.authority == f"localhost:{mocked_server.port}"
+    assert not hasattr(response.request, "scheme")
+    assert response.request.headers == {
+        "user-agent": helper.get_version_str(),
+        "accept": "*/*",
+        "host": f"localhost:{mocked_server.port}",
+    }
+
+    mocked_server.select_proto().assert_initial(
+        b"GET / HTTP/1.1",
+        b"User-Agent: %(self_ver_bytes)s",
+        b"Accept: */*",
+        f"Host: localhost:{mocked_server.port}".encode(),
+    )
 
 
 class GetTestCase:

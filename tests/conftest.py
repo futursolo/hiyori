@@ -19,6 +19,7 @@ from typing import Generator
 import asyncio
 import os
 
+import helpers
 import pytest
 
 import hiyori
@@ -51,3 +52,21 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
         loop = asyncio.new_event_loop()
 
     yield loop
+
+
+@pytest.fixture
+def mocked_server(
+    event_loop: asyncio.AbstractEventLoop,
+) -> Generator[helpers.MockedServer, None, None]:
+    async def create_mocked_server() -> helpers.MockedServer:
+        srv = helpers.MockedServer()
+        return await srv.__aenter__()
+
+    async def close_mocked_server(srv: helpers.MockedServer) -> None:
+        await srv.__aexit__()
+
+    srv = event_loop.run_until_complete(create_mocked_server())
+
+    yield srv
+
+    event_loop.run_until_complete(close_mocked_server(srv))
