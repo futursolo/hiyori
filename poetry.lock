@@ -102,7 +102,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 name = "coverage"
 version = "5.5"
 description = "Code coverage measurement for Python"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
 
@@ -607,7 +607,7 @@ aiodns = ["aiodns"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6.1"
-content-hash = "4086e72dd1b2793be868f9c2a613c1dd50ef5de9aa30a4e8788c79a322ceeebd"
+content-hash = "8fd0796ba96d932cd3e05b87dc8a6f6d5eb830a56ff37c810bff1c6d160bd5bf"
 
 [metadata.files]
 aiodns = [
