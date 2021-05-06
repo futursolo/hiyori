@@ -115,5 +115,4 @@ line_length = 79
 minversion = "6.0"
 testpaths = "tests/"
 python_files = "test_*.py"
-python_classes = "*TestCase"
 python_functions = "test_*"
