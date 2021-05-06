@@ -15,47 +15,51 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import asyncio
 import io
 
-from test_helper import MockServer, helper
+import helpers
+import pytest
 
 from hiyori import post
 from hiyori.multipart import File, MultipartRequestBody
 
 
-class MultipartEchoServer(MockServer):
-    def connection_made(self, transport):
+class MultipartEchoProtocol(helpers.BaseMockProtocol):
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
         super().connection_made(transport)
 
+        assert isinstance(transport, asyncio.Transport)
         transport.write(
             b"HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, World!"
         )
 
 
-class MultipartTestCase:
-    @helper.run_async_test(with_srv_cls=MultipartEchoServer)
-    async def test_simple(self):
-        await post(
-            "http://localhost:8000/",
-            body={"a": "b", "c": io.BytesIO(b"1234567890")},
-        )
+@pytest.mark.asyncio
+async def test_simple(mocked_server: helpers.MockedServer) -> None:
+    mocked_server.mock_proto_cls = MultipartEchoProtocol
+    await post(
+        f"http://localhost:{mocked_server.port}/",
+        body={"a": "b", "c": io.BytesIO(b"1234567890")},
+    )
 
-    @helper.run_async_test
-    async def test_detail(self):
-        body = MultipartRequestBody({"a": "b", "c": io.BytesIO(b"1234567890")})
-        boundary = body.boundary
 
-        body_buf = bytearray()
-        while True:
-            try:
-                body_buf += await body.read(128 * 1024)
+@pytest.mark.asyncio
+async def test_detail() -> None:
+    body = MultipartRequestBody({"a": "b", "c": io.BytesIO(b"1234567890")})
+    boundary = body.boundary
 
-            except EOFError:
-                break
+    body_buf = bytearray()
+    while True:
+        try:
+            body_buf += await body.read(128 * 1024)
 
-        assert (
-            body_buf
-            == b"""\
+        except EOFError:
+            break
+
+    assert (
+        body_buf
+        == b"""\
 --%(boundary)s\r
 Content-Disposition: form-data; name="a"\r
 \r
@@ -66,34 +70,35 @@ Content-Disposition: form-data; name="c"\r
 \r
 1234567890--%(boundary)s--\r
 """
-            % {b"boundary": boundary.encode()}
-        )
+        % {b"boundary": boundary.encode()}
+    )
 
-    @helper.run_async_test
-    async def test_with_file_obj(self):
-        body = MultipartRequestBody(
-            {
-                "a": "b",
-                "c": File(
-                    b"1234567890",
-                    filename="abc.example",
-                    content_type="x-application/example",
-                ),
-            }
-        )
-        boundary = body.boundary
 
-        body_buf = bytearray()
-        while True:
-            try:
-                body_buf += await body.read(128 * 1024)
+@pytest.mark.asyncio
+async def test_with_file_obj() -> None:
+    body = MultipartRequestBody(
+        {
+            "a": "b",
+            "c": File(
+                b"1234567890",
+                filename="abc.example",
+                content_type="x-application/example",
+            ),
+        }
+    )
+    boundary = body.boundary
 
-            except EOFError:
-                break
+    body_buf = bytearray()
+    while True:
+        try:
+            body_buf += await body.read(128 * 1024)
 
-        assert (
-            body_buf
-            == b"""\
+        except EOFError:
+            break
+
+    assert (
+        body_buf
+        == b"""\
 --%(boundary)s\r
 Content-Disposition: form-data; name="a"\r
 \r
@@ -104,5 +109,5 @@ Content-Disposition: form-data; name="c"; filename="abc.example"\r
 \r
 1234567890--%(boundary)s--\r
 """
-            % {b"boundary": boundary.encode()}
-        )
+        % {b"boundary": boundary.encode()}
+    )
