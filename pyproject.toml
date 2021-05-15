@@ -24,7 +24,7 @@ classifiers=[
 include=["hiyori/py.typed"]
 
 [tool.poetry.dependencies]
-python = "^3.6.1"
+python = "^3.7.1"
 importlib-metadata = { version = "^4.0.1", python = "<=3.7" }
 
 # Http

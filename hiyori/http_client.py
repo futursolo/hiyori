@@ -27,6 +27,7 @@ from typing import (
 )
 import asyncio
 import collections
+import dataclasses
 import re
 import ssl
 import urllib.parse
@@ -64,6 +65,7 @@ _BODY = Union[
 ]
 
 
+@dataclasses.dataclass
 class _ReadLock:
     def __init__(self, client_lock: "_ClientLock") -> None:
         self._idling = asyncio.Event()
@@ -88,6 +90,7 @@ class _ReadLock:
             self._idling.set()
 
 
+@dataclasses.dataclass
 class _CloseLock:
     def __init__(self, client_lock: "_ClientLock") -> None:
         self._closing = False
@@ -103,6 +106,7 @@ class _CloseLock:
         pass
 
 
+@dataclasses.dataclass
 class _ClientLock:
     def __init__(self) -> None:
         self.read_lock = _ReadLock(self)
