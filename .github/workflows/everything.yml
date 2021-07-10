@@ -110,10 +110,12 @@ jobs:
           pip install --upgrade pip
           pip install --upgrade poetry poetry-dynamic-versioning
           poetry install
+
       - name: Package Project
         run: |
           poetry version
           poetry build
+
       - name: Publish to Test PyPI
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
