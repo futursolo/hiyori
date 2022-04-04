@@ -307,18 +307,14 @@ test = ["pytest (>=6.0.1,<7)", "pytest-benchmark (>=3.2.3,<4)", "flake8 (>=3.8.2
 
 [[package]]
 name = "magichttp"
-version = "1.1.1"
+version = "1.1.2"
 description = "An http stack for asyncio."
 category = "main"
 optional = false
-python-versions = ">=3.6.0"
+python-versions = ">=3.6.1,<4.0.0"
 
 [package.dependencies]
-importlib-metadata = {version = ">=1.7.0", markers = "python_version < \"3.8\""}
-magicdict = ">=1.0.6,<2"
-
-[package.extras]
-test = ["pytest (>=6.0.1,<7)", "flake8 (>=3.8.3,<4)", "mypy (>=0.782,<1)"]
+magicdict = ">=1.0.6,<2.0.0"
 
 [[package]]
 name = "markupsafe"
@@ -797,8 +793,8 @@ magicdict = [
     {file = "magicdict-1.0.6.tar.gz", hash = "sha256:75a9e47056a11a3fb6c13e352267a0dfa0707da7089a93af44e10e467a0a0ae6"},
 ]
 magichttp = [
-    {file = "magichttp-1.1.1-py3-none-any.whl", hash = "sha256:b6f542984dfb23e0901edfca8c86e1839c5604204108be986c70bf3108eab200"},
-    {file = "magichttp-1.1.1.tar.gz", hash = "sha256:b8e627a32ac6ebb830b4b81c727c59b326d18151b66ce3c0da0e9d10c16e5923"},
+    {file = "magichttp-1.1.2-py3-none-any.whl", hash = "sha256:70507d8988a38a4134cc3c203300adf04c5655b53dd06f8bc5206a532d274dbf"},
+    {file = "magichttp-1.1.2.tar.gz", hash = "sha256:9d33d2218f40ab0f95d90350ad2583f00d11d15ad8bfc40c1b574ed66127cd9b"},
 ]
 markupsafe = [
     {file = "MarkupSafe-1.1.1-cp27-cp27m-macosx_10_6_intel.whl", hash = "sha256:09027a7803a62ca78792ad89403b1b7a73a01c8cb65909cd876f7fcebd79b161"},
