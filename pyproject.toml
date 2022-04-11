@@ -54,7 +54,7 @@ flake8-black = "^0.3.2"
 mypy = "^0.942"
 
 # Linters
-flake8 = "^3.9.2"
+flake8 = "^4.0.1"
 
 # Enforce docstring for public classes and functions
 #flake8-docstrings = "^1.6.0"
